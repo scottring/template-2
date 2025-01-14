@@ -6,6 +6,12 @@ import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon } from 'lucide-rea
 import { useGoalStore } from '@/lib/stores/useGoalStore';
 import { Goal } from '@/types/models';
 
+interface SuccessCriteria {
+  text: string;
+  isTracked: boolean;
+  timescale?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+}
+
 interface EditGoalDialogProps {
   goal: Goal;
   open: boolean;
@@ -18,7 +24,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
     name: '',
     description: '',
     targetDate: new Date(),
-    successCriteria: [''],
+    successCriteria: [] as SuccessCriteria[],
     progress: 0,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,7 +35,11 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
         name: goal.name,
         description: goal.description,
         targetDate: goal.targetDate,
-        successCriteria: goal.successCriteria.length > 0 ? goal.successCriteria : [''],
+        successCriteria: goal.successCriteria.map(criteria => ({
+          text: criteria,
+          isTracked: false,
+          timescale: undefined,
+        })),
         progress: goal.progress,
       });
     }
@@ -42,7 +52,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
     try {
       await updateGoal(goal.id, {
         ...formData,
-        successCriteria: formData.successCriteria.filter(Boolean),
+        successCriteria: formData.successCriteria.map(c => c.text).filter(Boolean),
       });
       onClose();
     } catch (error) {
@@ -55,7 +65,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
   const addCriteria = () => {
     setFormData((prev) => ({
       ...prev,
-      successCriteria: [...prev.successCriteria, ''],
+      successCriteria: [...prev.successCriteria, { text: '', isTracked: false }],
     }));
   };
 
@@ -66,10 +76,12 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
     }));
   };
 
-  const updateCriteria = (index: number, value: string) => {
+  const updateCriteria = (index: number, updates: Partial<SuccessCriteria>) => {
     setFormData((prev) => ({
       ...prev,
-      successCriteria: prev.successCriteria.map((c, i) => (i === index ? value : c)),
+      successCriteria: prev.successCriteria.map((c, i) => 
+        i === index ? { ...c, ...updates } : c
+      ),
     }));
   };
 
@@ -152,7 +164,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
 
                         <div>
                           <label htmlFor="targetDate" className="block text-sm font-medium leading-6 text-gray-900">
-                            Target Date
+                            End/Target Date
                           </label>
                           <div className="mt-2">
                             <input
@@ -199,25 +211,56 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                               Add Criteria
                             </button>
                           </div>
-                          <div className="mt-2 space-y-2">
+                          <div className="mt-2 space-y-4">
                             {formData.successCriteria.map((criteria, index) => (
-                              <div key={index} className="flex gap-x-2">
-                                <input
-                                  type="text"
-                                  value={criteria}
-                                  onChange={(e) => updateCriteria(index, e.target.value)}
-                                  placeholder="Enter success criteria"
-                                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                                />
-                                {formData.successCriteria.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => removeCriteria(index)}
-                                    className="inline-flex items-center rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-red-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-red-50"
-                                  >
-                                    <TrashIcon className="h-4 w-4" />
-                                  </button>
-                                )}
+                              <div key={index} className="space-y-2">
+                                <div className="flex gap-x-2">
+                                  <input
+                                    type="text"
+                                    value={criteria.text}
+                                    onChange={(e) => updateCriteria(index, { text: e.target.value })}
+                                    placeholder="Enter success criteria"
+                                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                                  />
+                                  {formData.successCriteria.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeCriteria(index)}
+                                      className="inline-flex items-center rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-red-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-red-50"
+                                    >
+                                      <TrashIcon className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-x-4">
+                                  <label className="flex items-center gap-x-2 text-sm text-gray-600">
+                                    <input
+                                      type="checkbox"
+                                      checked={criteria.isTracked}
+                                      onChange={(e) => updateCriteria(index, { 
+                                        isTracked: e.target.checked,
+                                        timescale: e.target.checked ? 'weekly' : undefined 
+                                      })}
+                                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                                    />
+                                    Track in Itinerary
+                                  </label>
+                                  {criteria.isTracked && (
+                                    <select
+                                      value={criteria.timescale}
+                                      onChange={(e) => updateCriteria(index, { 
+                                        timescale: e.target.value as SuccessCriteria['timescale']
+                                      })}
+                                      className="rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                                    >
+                                      <option value="daily">Daily</option>
+                                      <option value="weekly">Weekly</option>
+                                      <option value="monthly">Monthly</option>
+                                      <option value="quarterly">Quarterly</option>
+                                      <option value="yearly">Yearly</option>
+                                    </select>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>

@@ -233,7 +233,16 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
         <div className="space-y-6">
           <div className="overflow-hidden rounded-lg bg-white shadow">
             <div className="p-6">
-              <h2 className="text-lg font-medium text-gray-900">Details</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-medium text-gray-900">Details</h2>
+                <button
+                  type="button"
+                  onClick={() => setIsEditDialogOpen(true)}
+                  className="inline-flex items-center gap-x-2 rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                >
+                  Edit Details
+                </button>
+              </div>
               <dl className="mt-4 space-y-4">
                 <div className="flex items-center gap-x-4">
                   <dt className="flex-shrink-0">
