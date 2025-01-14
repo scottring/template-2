@@ -7,12 +7,12 @@ import { useAuth } from '@/lib/contexts/AuthContext';
 import { Settings, LogOut } from 'lucide-react';
 
 export function UserMenu() {
-  const { user, signOutUser } = useAuth();
+  const { user, signOut } = useAuth();
   const router = useRouter();
 
   const handleSignOut = async () => {
     try {
-      await signOutUser();
+      await signOut();
       router.push('/auth/signin');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -76,4 +76,4 @@ export function UserMenu() {
       </Transition>
     </Menu>
   );
-} 
+}

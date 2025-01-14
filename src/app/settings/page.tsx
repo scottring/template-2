@@ -9,7 +9,7 @@ import { ArrowLeft } from 'lucide-react';
 import { FamilyManagement } from '@/components/family/FamilyManagement';
 
 export default function SettingsPage() {
-  const { user, signOutUser } = useAuth();
+  const { user, signOut } = useAuth();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [settings, setSettings] = useState({
@@ -38,7 +38,7 @@ export default function SettingsPage() {
 
   const handleSignOut = async () => {
     try {
-      await signOutUser();
+      await signOut();
       router.push('/auth/signin');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -192,4 +192,4 @@ export default function SettingsPage() {
       </div>
     </div>
   );
-} 
+}

@@ -14,15 +14,17 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
-  signOutUser: () => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signInWithGoogle: async () => {},
-  signOutUser: async () => {},
+  signOut: async () => {},
 });
+
+export { AuthContext };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -47,9 +49,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signOutUser = async () => {
+  const signOut = async () => {
     try {
-      await signOut(auth);
+      await signOut();
     } catch (error) {
       console.error('Error signing out:', error);
       throw error;
@@ -62,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         loading,
         signInWithGoogle,
-        signOutUser,
+        signOut,
       }}
     >
       {children}
