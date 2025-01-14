@@ -6,17 +6,19 @@ import { X as XMarkIcon } from 'lucide-react';
 import { useTaskStore } from '@/lib/stores/useTaskStore';
 
 interface CreateTaskDialogProps {
-  projectId: string;
+  projectId?: string;
+  goalId?: string;
   open: boolean;
   onClose: () => void;
 }
 
-export function CreateTaskDialog({ projectId, open, onClose }: CreateTaskDialogProps) {
+export function CreateTaskDialog({ projectId, goalId, open, onClose }: CreateTaskDialogProps) {
   const addTask = useTaskStore((state) => state.addTask);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    projectId: projectId,
+    projectId: projectId || '',
+    goalId: goalId || '',
     dueDate: new Date(),
     isCompleted: false,
     isRecurring: false,
@@ -35,7 +37,8 @@ export function CreateTaskDialog({ projectId, open, onClose }: CreateTaskDialogP
       setFormData({
         name: '',
         description: '',
-        projectId: projectId,
+        projectId: projectId || '',
+        goalId: goalId || '',
         dueDate: new Date(),
         isCompleted: false,
         isRecurring: false,
@@ -170,4 +173,4 @@ export function CreateTaskDialog({ projectId, open, onClose }: CreateTaskDialogP
       </Dialog>
     </Transition.Root>
   );
-} 
+}
