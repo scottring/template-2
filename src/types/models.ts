@@ -74,4 +74,25 @@ export interface User {
   role: 'admin' | 'member';
   createdAt: Date;
   updatedAt: Date;
+}
+
+export type TimeScale = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type ItineraryType = 'planning' | 'review';
+
+export interface ItineraryItem {
+  id: string;
+  type: 'task' | 'routine' | 'habit' | 'goal' | 'project';
+  referenceId: string;
+  status: 'pending' | 'completed' | 'deferred' | 'cancelled';
+  notes?: string;
+}
+
+export interface Itinerary {
+  id: string;
+  userId: string;
+  type: ItineraryType;
+  timeScale: TimeScale;
+  date: Date;
+  items: ItineraryItem[];
+  isCompleted: boolean;
 } 
