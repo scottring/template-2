@@ -5,19 +5,23 @@ import { doc, onSnapshot, query, collection, orderBy } from 'firebase/firestore'
 import { db } from '@/lib/firebase/firebase';
 import { Project, Task } from '@/types/models';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, PlusIcon, MoreVertical, Calendar, CheckCircle2, ListTodo } from 'lucide-react';
+import { ArrowLeft, PlusIcon, MoreVertical, Calendar, CheckCircle2, ListTodo, Share2 } from 'lucide-react';
 import { useProjectStore } from '@/lib/stores/useProjectStore';
 import { useTaskStore } from '@/lib/stores/useTaskStore';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import { EditProjectDialog } from '@/components/projects/EditProjectDialog';
 import { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog';
+import { SharedIndicator } from '@/components/shared/SharedIndicator';
+import { ShareDialog } from '@/components/shared/ShareDialog';
 
 export default function ProjectDetailPage({ params }: { params: { id: string } }) {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateTaskDialogOpen, setIsCreateTaskDialogOpen] = useState(false);
+  const [sharingProject, setSharingProject] = useState<Project | null>(null);
+  const [sharingTask, setSharingTask] = useState<Task | null>(null);
   const router = useRouter();
   const { deleteProject } = useProjectStore();
   const { tasks, setTasks, toggleTaskCompletion } = useTaskStore();
@@ -98,7 +102,10 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex-grow">
-          <h1 className="text-2xl font-semibold text-gray-900">{project.name}</h1>
+          <div className="flex items-center gap-x-3">
+            <h1 className="text-2xl font-semibold text-gray-900">{project.name}</h1>
+            <SharedIndicator sharedWith={project.assignedTo} />
+          </div>
           <p className="mt-1 text-sm text-gray-500">{project.description}</p>
         </div>
         <div className="flex items-center gap-x-2">
@@ -109,6 +116,14 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
           >
             <PlusIcon className="-ml-0.5 h-5 w-5" aria-hidden="true" />
             New Task
+          </button>
+          <button
+            type="button"
+            onClick={() => setSharingProject(project)}
+            className="inline-flex items-center gap-x-2 rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+          >
+            <Share2 className="-ml-0.5 h-5 w-5" aria-hidden="true" />
+            Share
           </button>
           <Menu as="div" className="relative inline-block text-left">
             <Menu.Button className="flex items-center rounded-full bg-white p-2 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
@@ -197,9 +212,12 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
                         <CheckCircle2 className="h-5 w-5" />
                       </button>
                       <div>
-                        <h3 className={`text-sm font-medium ${task.isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                          {task.name}
-                        </h3>
+                        <div className="flex items-center gap-x-3">
+                          <h3 className={`text-sm font-medium ${task.isCompleted ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                            {task.name}
+                          </h3>
+                          <SharedIndicator sharedWith={task.assignedTo} />
+                        </div>
                         <p className={`mt-1 text-sm ${task.isCompleted ? 'line-through text-gray-400' : 'text-gray-500'}`}>
                           {task.description}
                         </p>
@@ -210,6 +228,13 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
                         )}
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setSharingTask(task)}
+                      className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500"
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </button>
                   </div>
                 ))}
                 {projectTasks.length === 0 && (
@@ -262,6 +287,26 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
         open={isCreateTaskDialogOpen}
         onClose={() => setIsCreateTaskDialogOpen(false)}
       />
+
+      {sharingProject && (
+        <ShareDialog
+          open={true}
+          onClose={() => setSharingProject(null)}
+          itemType="projects"
+          itemId={sharingProject.id}
+          itemName={sharingProject.name}
+        />
+      )}
+
+      {sharingTask && (
+        <ShareDialog
+          open={true}
+          onClose={() => setSharingTask(null)}
+          itemType="tasks"
+          itemId={sharingTask.id}
+          itemName={sharingTask.name}
+        />
+      )}
     </div>
   );
 } 

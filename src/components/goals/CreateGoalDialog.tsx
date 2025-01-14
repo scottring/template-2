@@ -4,6 +4,8 @@ import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon } from 'lucide-react';
 import { useGoalStore } from '@/lib/stores/useGoalStore';
+import { useUserStore } from '@/lib/stores/useUserStore';
+import { UserSelect } from '@/components/shared/UserSelect';
 
 interface CreateGoalDialogProps {
   areaId: string;
@@ -20,6 +22,7 @@ export function CreateGoalDialog({ areaId, open, onClose }: CreateGoalDialogProp
     targetDate: new Date(),
     successCriteria: [''],
     progress: 0,
+    assignedTo: [] as string[],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -40,6 +43,7 @@ export function CreateGoalDialog({ areaId, open, onClose }: CreateGoalDialogProp
         targetDate: new Date(),
         successCriteria: [''],
         progress: 0,
+        assignedTo: [],
       });
     } catch (error) {
       console.error('Error creating goal:', error);
@@ -201,6 +205,26 @@ export function CreateGoalDialog({ areaId, open, onClose }: CreateGoalDialogProp
                           </div>
                         </div>
 
+                        <div>
+                          <label htmlFor="assignedTo" className="block text-sm font-medium leading-6 text-gray-900">
+                            Assign to Users
+                          </label>
+                          <div className="mt-2">
+                            <UserSelect
+                              users={useUserStore.getState().users}
+                              selectedUserIds={formData.assignedTo}
+                              onSelect={(userId) => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  assignedTo: prev.assignedTo.includes(userId)
+                                    ? prev.assignedTo.filter((id) => id !== userId)
+                                    : [...prev.assignedTo, userId]
+                                }));
+                              }}
+                            />
+                          </div>
+                        </div>
+
                         <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
                           <button
                             type="submit"
@@ -228,4 +252,4 @@ export function CreateGoalDialog({ areaId, open, onClose }: CreateGoalDialogProp
       </Dialog>
     </Transition.Root>
   );
-} 
+}

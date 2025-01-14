@@ -14,22 +14,25 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 
-interface UserProfile {
+export interface UserProfile {
   id: string;
   email: string;
   displayName: string;
   photoURL?: string;
   familyId?: string;
-  sharedWith: string[]; // Array of user IDs this user shares with
+  sharedWith: string[];
 }
 
 interface UserStore {
   currentUserProfile: UserProfile | null;
   familyMembers: UserProfile[];
+  users: UserProfile[];
   setCurrentUserProfile: (profile: UserProfile | null) => void;
   setFamilyMembers: (members: UserProfile[]) => void;
+  setUsers: (users: UserProfile[]) => void;
   fetchUserProfile: (userId: string) => Promise<void>;
   fetchFamilyMembers: (familyId: string) => Promise<void>;
+  fetchUsers: () => Promise<void>;
   inviteUserToFamily: (email: string) => Promise<void>;
   removeUserFromFamily: (userId: string) => Promise<void>;
   shareItemWithUser: (userId: string, itemType: string, itemId: string) => Promise<void>;
@@ -39,9 +42,24 @@ interface UserStore {
 export const useUserStore = create<UserStore>((set, get) => ({
   currentUserProfile: null,
   familyMembers: [],
+  users: [],
 
   setCurrentUserProfile: (profile) => set({ currentUserProfile: profile }),
   setFamilyMembers: (members) => set({ familyMembers: members }),
+  setUsers: (users) => set({ users }),
+
+  fetchUsers: async () => {
+    try {
+      const q = query(collection(db, 'users'));
+      const querySnapshot = await getDocs(q);
+      const users = querySnapshot.docs.map(
+        (doc) => ({ id: doc.id, ...doc.data() } as UserProfile)
+      );
+      set({ users });
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  },
 
   fetchUserProfile: async (userId: string) => {
     try {
@@ -159,4 +177,4 @@ export const useUserStore = create<UserStore>((set, get) => ({
       console.error('Error unsharing item:', error);
     }
   },
-})); 
+}));

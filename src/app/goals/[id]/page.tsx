@@ -5,7 +5,7 @@ import { doc, onSnapshot, query, collection, orderBy } from 'firebase/firestore'
 import { db } from '@/lib/firebase/firebase';
 import { Goal, Project } from '@/types/models';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, PlusIcon, MoreVertical, Calendar, Target, CheckCircle } from 'lucide-react';
+import { ArrowLeft, PlusIcon, MoreVertical, Calendar, Target, CheckCircle, Share2 } from 'lucide-react';
 import { useGoalStore } from '@/lib/stores/useGoalStore';
 import { useProjectStore } from '@/lib/stores/useProjectStore';
 import { Menu, Transition } from '@headlessui/react';
@@ -14,12 +14,15 @@ import { EditGoalDialog } from '@/components/goals/EditGoalDialog';
 import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
 import { TasksSection } from '@/components/goals/TasksSection';
 import { Notepad } from '@/components/shared/Notepad';
+import { SharedIndicator } from '@/components/shared/SharedIndicator';
+import { ShareDialog } from '@/components/shared/ShareDialog';
 
 export default function GoalDetailPage({ params }: { params: { id: string } }) {
   const [goal, setGoal] = useState<Goal | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateProjectDialogOpen, setIsCreateProjectDialogOpen] = useState(false);
+  const [sharingGoal, setSharingGoal] = useState<Goal | null>(null);
   const router = useRouter();
   const { deleteGoal } = useGoalStore();
   const { projects, setProjects } = useProjectStore();
@@ -95,8 +98,73 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex-grow">
-          <h1 className="text-2xl font-semibold text-gray-900">{goal.name}</h1>
+          <div className="flex items-center gap-x-3">
+            <h1 className="text-2xl font-semibold text-gray-900">{goal.name}</h1>
+            <SharedIndicator sharedWith={goal.assignedTo} />
+          </div>
           <p className="mt-1 text-sm text-gray-500">{goal.description}</p>
+        </div>
+        <div className="flex items-center gap-x-2">
+          <button
+            type="button"
+            onClick={() => setIsCreateProjectDialogOpen(true)}
+            className="inline-flex items-center gap-x-2 rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          >
+            <PlusIcon className="-ml-0.5 h-5 w-5" aria-hidden="true" />
+            New Project
+          </button>
+          <button
+            type="button"
+            onClick={() => setSharingGoal(goal)}
+            className="inline-flex items-center gap-x-2 rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+          >
+            <Share2 className="-ml-0.5 h-5 w-5" aria-hidden="true" />
+            Share
+          </button>
+          <Menu as="div" className="relative inline-block text-left">
+            <Menu.Button className="flex items-center rounded-full bg-white p-2 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+              <span className="sr-only">Open options</span>
+              <MoreVertical className="h-5 w-5" aria-hidden="true" />
+            </Menu.Button>
+            <Transition
+              as={Fragment}
+              enter="transition ease-out duration-100"
+              enterFrom="transform opacity-0 scale-95"
+              enterTo="transform opacity-100 scale-100"
+              leave="transition ease-in duration-75"
+              leaveFrom="transform opacity-100 scale-100"
+              leaveTo="transform opacity-0 scale-95"
+            >
+              <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                <div className="py-1">
+                  <Menu.Item>
+                    {({ active }) => (
+                      <button
+                        onClick={() => setIsEditDialogOpen(true)}
+                        className={`${
+                          active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
+                        } block w-full px-4 py-2 text-left text-sm`}
+                      >
+                        Edit Goal
+                      </button>
+                    )}
+                  </Menu.Item>
+                  <Menu.Item>
+                    {({ active }) => (
+                      <button
+                        onClick={handleDeleteGoal}
+                        className={`${
+                          active ? 'bg-red-50 text-red-900' : 'text-red-700'
+                        } block w-full px-4 py-2 text-left text-sm`}
+                      >
+                        Delete Goal
+                      </button>
+                    )}
+                  </Menu.Item>
+                </div>
+              </Menu.Items>
+            </Transition>
+          </Menu>
         </div>
       </div>
 
@@ -210,6 +278,16 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
         open={isCreateProjectDialogOpen}
         onClose={() => setIsCreateProjectDialogOpen(false)}
       />
+
+      {sharingGoal && (
+        <ShareDialog
+          open={true}
+          onClose={() => setSharingGoal(null)}
+          itemType="goals"
+          itemId={sharingGoal.id}
+          itemName={sharingGoal.name}
+        />
+      )}
     </div>
   );
 }
