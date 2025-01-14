@@ -12,6 +12,8 @@ import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import { EditGoalDialog } from '@/components/goals/EditGoalDialog';
 import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
+import { TasksSection } from '@/components/goals/TasksSection';
+import { Notepad } from '@/components/shared/Notepad';
 
 export default function GoalDetailPage({ params }: { params: { id: string } }) {
   const [goal, setGoal] = useState<Goal | null>(null);
@@ -96,60 +98,6 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
           <h1 className="text-2xl font-semibold text-gray-900">{goal.name}</h1>
           <p className="mt-1 text-sm text-gray-500">{goal.description}</p>
         </div>
-        <div className="flex items-center gap-x-2">
-          <button
-            type="button"
-            onClick={() => setIsCreateProjectDialogOpen(true)}
-            className="inline-flex items-center gap-x-2 rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-          >
-            <PlusIcon className="-ml-0.5 h-5 w-5" aria-hidden="true" />
-            New Project
-          </button>
-          <Menu as="div" className="relative inline-block text-left">
-            <Menu.Button className="flex items-center rounded-full bg-white p-2 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-              <span className="sr-only">Open options</span>
-              <MoreVertical className="h-5 w-5" aria-hidden="true" />
-            </Menu.Button>
-            <Transition
-              as={Fragment}
-              enter="transition ease-out duration-100"
-              enterFrom="transform opacity-0 scale-95"
-              enterTo="transform opacity-100 scale-100"
-              leave="transition ease-in duration-75"
-              leaveFrom="transform opacity-100 scale-100"
-              leaveTo="transform opacity-0 scale-95"
-            >
-              <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                <div className="py-1">
-                  <Menu.Item>
-                    {({ active }) => (
-                      <button
-                        onClick={() => setIsEditDialogOpen(true)}
-                        className={`${
-                          active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
-                        } block w-full px-4 py-2 text-left text-sm`}
-                      >
-                        Edit Goal
-                      </button>
-                    )}
-                  </Menu.Item>
-                  <Menu.Item>
-                    {({ active }) => (
-                      <button
-                        onClick={handleDeleteGoal}
-                        className={`${
-                          active ? 'bg-red-50 text-red-900' : 'text-red-700'
-                        } block w-full px-4 py-2 text-left text-sm`}
-                      >
-                        Delete Goal
-                      </button>
-                    )}
-                  </Menu.Item>
-                </div>
-              </Menu.Items>
-            </Transition>
-          </Menu>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -173,9 +121,21 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
             </div>
           </div>
 
+          <TasksSection goalId={params.id} />
+
           <div className="overflow-hidden rounded-lg bg-white shadow">
             <div className="p-6">
-              <h2 className="text-lg font-medium text-gray-900">Projects</h2>
+              <h2 className="text-lg font-medium text-gray-900 flex items-center justify-between">
+                Projects
+                <button
+                  type="button"
+                  onClick={() => setIsCreateProjectDialogOpen(true)}
+                  className="inline-flex items-center rounded-md bg-blue-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                >
+                  <PlusIcon className="-ml-0.5 mr-1.5 h-5 w-5" aria-hidden="true" />
+                  New Project
+                </button>
+              </h2>
               <div className="mt-6 divide-y divide-gray-200">
                 {goalProjects.map((project: Project) => (
                   <div key={project.id} className="flex items-center justify-between py-4">
@@ -252,4 +212,4 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
       />
     </div>
   );
-} 
+}
