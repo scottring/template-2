@@ -12,6 +12,7 @@ import {
   Calendar as CalendarIcon,
   Users as UsersIcon,
   LogOut as LogOutIcon,
+  ListTodo as ListTodoIcon,
 } from 'lucide-react';
 import { classNames } from '@/lib/utils';
 import Link from 'next/link';
@@ -26,6 +27,7 @@ const navigation = [
   { name: 'Tasks', href: '/tasks', icon: CheckCircleIcon },
   { name: 'Calendar', href: '/calendar', icon: CalendarIcon },
   { name: 'Family', href: '/family', icon: UsersIcon },
+  { name: 'Itinerary', href: '/itinerary', icon: ListTodoIcon },
 ];
 
 export function Dashboard() {
