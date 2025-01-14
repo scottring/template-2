@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon } from 'lucide-react';
+import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon, Share2 } from 'lucide-react';
 import { useGoalStore } from '@/lib/stores/useGoalStore';
 import { useUserStore } from '@/lib/stores/useUserStore';
 import { UserSelect } from '@/components/shared/UserSelect';
@@ -206,9 +206,15 @@ export function CreateGoalDialog({ areaId, open, onClose }: CreateGoalDialogProp
                         </div>
 
                         <div>
-                          <label htmlFor="assignedTo" className="block text-sm font-medium leading-6 text-gray-900">
-                            Assign to Users
-                          </label>
+                          <div className="flex items-center gap-x-2">
+                            <Share2 className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                            <label htmlFor="assignedTo" className="block text-sm font-medium leading-6 text-gray-900">
+                              Share with Family Members
+                            </label>
+                          </div>
+                          <p className="mt-1 text-sm text-gray-500">
+                            Select family members to share and collaborate on this goal
+                          </p>
                           <div className="mt-2">
                             <UserSelect
                               users={useUserStore.getState().users}
