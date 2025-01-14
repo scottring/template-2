@@ -4,6 +4,8 @@ import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X as XMarkIcon } from 'lucide-react';
 import { useAreaStore } from '@/lib/stores/useAreaStore';
+import { useUserStore } from '@/lib/stores/useUserStore';
+import { UserSelect } from '@/components/shared/UserSelect';
 
 interface CreateAreaDialogProps {
   open: boolean;
@@ -12,11 +14,18 @@ interface CreateAreaDialogProps {
 
 export function CreateAreaDialog({ open, onClose }: CreateAreaDialogProps) {
   const addArea = useAreaStore((state) => state.addArea);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    isActive: boolean;
+    isFocus: boolean;
+    assignedTo: string[];
+  }>({
     name: '',
     description: '',
     isActive: true,
     isFocus: false,
+    assignedTo: [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -32,6 +41,7 @@ export function CreateAreaDialog({ open, onClose }: CreateAreaDialogProps) {
         description: '',
         isActive: true,
         isFocus: false,
+        assignedTo: [],
       });
     } catch (error) {
       console.error('Error creating area:', error);
@@ -117,6 +127,26 @@ export function CreateAreaDialog({ open, onClose }: CreateAreaDialogProps) {
                           </div>
                         </div>
 
+                        <div>
+                          <label htmlFor="assignedTo" className="block text-sm font-medium leading-6 text-gray-900">
+                            Assign to Users
+                          </label>
+                          <div className="mt-2">
+                            <UserSelect
+                              users={useUserStore.getState().users}
+                              selectedUserIds={formData.assignedTo}
+                              onSelect={(userId) => {
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  assignedTo: prev.assignedTo.includes(userId)
+                                    ? prev.assignedTo.filter((id) => id !== userId)
+                                    : [...prev.assignedTo, userId]
+                                }));
+                              }}
+                            />
+                          </div>
+                        </div>
+
                         <div className="flex items-center gap-x-6">
                           <div className="flex items-center">
                             <input
@@ -173,4 +203,4 @@ export function CreateAreaDialog({ open, onClose }: CreateAreaDialogProps) {
       </Dialog>
     </Transition.Root>
   );
-} 
+}

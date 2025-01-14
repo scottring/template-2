@@ -1,7 +1,7 @@
 'use client';
 
 import { useAreaStore } from '@/lib/stores/useAreaStore';
-import { PlusIcon, MoreVertical, Trash } from 'lucide-react';
+import { PlusIcon, MoreVertical, Trash, Share2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { CreateAreaDialog } from '@/components/areas/CreateAreaDialog';
 import { EditAreaDialog } from '@/components/areas/EditAreaDialog';
@@ -11,11 +11,14 @@ import { Area } from '@/types/models';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import { useRouter } from 'next/navigation';
+import { SharedIndicator } from '@/components/shared/SharedIndicator';
+import { ShareDialog } from '@/components/shared/ShareDialog';
 
 export default function AreasPage() {
   const { areas, setAreas, deleteArea } = useAreaStore();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingArea, setEditingArea] = useState<Area | null>(null);
+  const [sharingArea, setSharingArea] = useState<Area | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -135,6 +138,7 @@ export default function AreasPage() {
                     Active
                   </span>
                 )}
+                <SharedIndicator sharedWith={area.assignedTo} />
               </div>
               <p className="mt-2 text-sm text-gray-500">{area.description}</p>
             </div>
@@ -145,6 +149,14 @@ export default function AreasPage() {
                 className="flex w-full items-center justify-center gap-x-2.5 p-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
               >
                 View Goals
+              </button>
+              <button
+                type="button"
+                onClick={() => setSharingArea(area)}
+                className="flex w-full items-center justify-center gap-x-2.5 p-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+              >
+                <Share2 className="h-4 w-4" />
+                Share
               </button>
             </div>
           </div>
@@ -180,6 +192,16 @@ export default function AreasPage() {
           area={editingArea}
           open={true}
           onClose={() => setEditingArea(null)}
+        />
+      )}
+
+      {sharingArea && (
+        <ShareDialog
+          open={true}
+          onClose={() => setSharingArea(null)}
+          itemType="areas"
+          itemId={sharingArea.id}
+          itemName={sharingArea.name}
         />
       )}
     </div>

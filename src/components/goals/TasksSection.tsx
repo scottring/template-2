@@ -1,12 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { PlusIcon } from 'lucide-react';
+import { PlusIcon, Share2 } from 'lucide-react';
 import { useTaskStore } from '@/lib/stores/useTaskStore';
 import { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog';
+import { SharedIndicator } from '@/components/shared/SharedIndicator';
+import { ShareDialog } from '@/components/shared/ShareDialog';
+import { Task } from '@/types/models';
 
 export function TasksSection({ goalId }: { goalId: string }) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [sharingTask, setSharingTask] = useState<Task | null>(null);
   const { tasks } = useTaskStore();
   const goalTasks = tasks.filter((task) => task.goalId === goalId);
 
@@ -28,16 +32,26 @@ export function TasksSection({ goalId }: { goalId: string }) {
           {goalTasks.map((task) => (
             <div key={task.id} className="flex items-center justify-between py-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-900">{task.name}</h3>
+                <div className="flex items-center gap-x-3">
+                  <h3 className="text-sm font-medium text-gray-900">{task.name}</h3>
+                  <SharedIndicator sharedWith={task.assignedTo} />
+                </div>
                 <p className="mt-1 text-sm text-gray-500">{task.description}</p>
               </div>
-              <div className="flex items-center gap-x-2">
+              <div className="flex items-center gap-x-4">
                 <input
                   type="checkbox"
                   checked={task.isCompleted}
                   onChange={() => {}}
                   className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
+                <button
+                  type="button"
+                  onClick={() => setSharingTask(task)}
+                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500"
+                >
+                  <Share2 className="h-4 w-4" />
+                </button>
               </div>
             </div>
           ))}
@@ -54,6 +68,16 @@ export function TasksSection({ goalId }: { goalId: string }) {
         open={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
       />
+
+      {sharingTask && (
+        <ShareDialog
+          open={true}
+          onClose={() => setSharingTask(null)}
+          itemType="tasks"
+          itemId={sharingTask.id}
+          itemName={sharingTask.name}
+        />
+      )}
     </div>
   );
 }

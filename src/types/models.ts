@@ -4,6 +4,7 @@ export interface Area {
   description: string;
   isActive: boolean;
   isFocus: boolean;
+  assignedTo: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -16,6 +17,7 @@ export interface Goal {
   successCriteria: string[];
   targetDate: Date;
   progress: number;
+  assignedTo: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -95,4 +97,4 @@ export interface Itinerary {
   date: Date;
   items: ItineraryItem[];
   isCompleted: boolean;
-} 
+}
