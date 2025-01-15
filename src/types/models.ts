@@ -1,123 +1,212 @@
-export interface Area {
+export type TimeScale = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+
+export interface BaseItem {
   id: string;
-  name: string;
-  description: string;
-  isActive: boolean;
-  isFocus: boolean;
-  assignedTo: string[];
   createdAt: Date;
   updatedAt: Date;
+  createdBy: string;
+  updatedBy: string;
 }
 
-export interface Goal {
-  id: string;
-  areaId: string;
+export interface Household extends BaseItem {
   name: string;
-  description: string;
-  successCriteria: SuccessCriteria[];
-  startDate: Date;
-  targetDate: Date;
-  progress: number;
-  assignedTo: string[];
-  createdAt: Date;
-  updatedAt: Date;
+  members: HouseholdMember[];
+  inviteCodes: InviteCode[];
 }
 
-export interface SuccessCriteria {
-  text: string;
-  frequency?: number;
-  timescale?: TimeScale;
-  isTracked?: boolean;
-}
-
-export interface Project {
-  id: string;
-  goalId: string;
-  name: string;
-  description: string;
-  startDate: Date;
-  endDate: Date;
-  progress: number;
-  assignedTo: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Task {
-  id: string;
-  projectId?: string;
-  goalId?: string;
-  name: string;
-  description: string;
-  isRecurring: boolean;
-  recurringPattern?: string;
-  completionCriteria: string[];
-  assignedTo: string[];
-  dueDate: Date;
-  isCompleted: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface Routine {
-  id: string;
-  name: string;
-  description: string;
-  frequency: {
-    type: 'daily' | 'weekly' | 'monthly';
-    value: number;
-  };
-  progress?: {
-    completed: number;
-    total: number;
-  };
-  streak?: number;
-  assignedTo: string[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Keeping Habit for backwards compatibility
-export interface Habit extends Routine {}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
+export interface HouseholdMember {
+  userId: string;
   role: 'admin' | 'member';
+  displayName: string;
+  photoURL?: string;
+  preferences: MemberPreferences;
+  defaultAssignments: string[]; // task IDs
+  joinedAt: Date;
+}
+
+export interface InviteCode {
+  code: string;
   createdAt: Date;
-  updatedAt: Date;
+  expiresAt: Date;
+  usedBy?: string;
+  usedAt?: Date;
 }
 
-export type TimeScale = 'daily' | 'weekly' | 'monthly' | 'quarterly';
-export type ItineraryType = 'planning' | 'review';
-
-export interface DaySchedule {
-  day: number;
-  time: string;
+export interface MemberPreferences {
+  notifications: NotificationPreferences;
+  defaultView: 'day' | 'week' | 'month';
+  colorScheme: string;
 }
 
-export interface Schedule {
-  schedules: DaySchedule[];
-  repeat: TimeScale;
+export interface NotificationPreferences {
+  taskReminders: boolean;
+  planningReminders: boolean;
+  inventoryAlerts: boolean;
+  taskAssignments: boolean;
+  reminderHoursBefore: number;
 }
 
-export interface ItineraryItem {
-  id: string;
-  notes: string;
-  type: 'habit' | 'task' | 'event';
-  status: 'pending' | 'completed';
-  schedule?: Schedule;
+export interface Task extends BaseItem {
+  title: string;
+  description?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  priority: 'high' | 'medium' | 'low';
+  category: TaskCategory;
   dueDate?: Date;
-  referenceId?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  completedAt?: Date;
+  assignedTo: string[];
+  recurrence?: RecurrencePattern;
+  resources?: string[]; // Resource IDs
+  notes?: Note[];
+  checklist?: ChecklistItem[];
+  tags: string[];
 }
 
-export interface Itinerary {
-  type: ItineraryType;
-  timeScale: TimeScale;
+export type TaskCategory = 
+  | 'chore' 
+  | 'errand' 
+  | 'maintenance' 
+  | 'kids' 
+  | 'meal' 
+  | 'shopping'
+  | 'finance'
+  | 'health'
+  | 'social'
+  | 'other';
+
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  completedAt?: Date;
+  completedBy?: string;
+}
+
+export interface Note {
+  id: string;
+  text: string;
+  createdAt: Date;
+  createdBy: string;
+  type: 'comment' | 'update' | 'question';
+}
+
+export interface RecurrencePattern {
+  frequency: number;
+  interval: TimeScale;
+  endAfter?: number;
+  endDate?: Date;
+  daysOfWeek?: number[]; // 0-6 for Sunday-Saturday
+  dayOfMonth?: number;
+  monthOfYear?: number;
+  skipHolidays?: boolean;
+}
+
+export interface Resource extends BaseItem {
+  name: string;
+  type: ResourceType;
+  category: string;
+  value: number;
+  unit?: string;
+  threshold?: number;
+  location?: string;
+  notes?: string;
+  history: ResourceHistory[];
+  tags: string[];
+}
+
+export type ResourceType = 
+  | 'inventory' 
+  | 'budget' 
+  | 'document';
+
+export interface ResourceHistory {
+  id: string;
+  previousValue: number;
+  newValue: number;
   date: Date;
-  items: ItineraryItem[];
-  isCompleted: boolean;
+  notes?: string;
+  updatedBy: string;
+}
+
+export interface MealPlan extends BaseItem {
+  date: Date;
+  meals: Meal[];
+  notes?: string;
+  groceryList?: GroceryItem[];
+}
+
+export interface Meal {
+  type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  name: string;
+  recipe?: string;
+  prepTime?: number;
+  cookTime?: number;
+  assignedTo?: string[];
+  ingredients: GroceryItem[];
+  notes?: string;
+}
+
+export interface GroceryItem {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  unit?: string;
+  purchased?: boolean;
+  purchasedBy?: string;
+  purchasedAt?: Date;
+  notes?: string;
+}
+
+export interface Schedule extends BaseItem {
+  date: Date;
+  events: Event[];
+}
+
+export interface Event {
+  id: string;
+  title: string;
+  description?: string;
+  startTime: Date;
+  endTime: Date;
+  location?: string;
+  participants: string[];
+  category: 'family' | 'personal' | 'work' | 'kids' | 'other';
+  recurrence?: RecurrencePattern;
+  reminders?: number[]; // minutes before event
+}
+
+export interface Budget extends BaseItem {
+  householdId: string;
+  date: Date;
+  categories: BudgetCategory[];
+  notes?: string;
+  totalBudget: number;
+  totalSpent: number;
+}
+
+export interface BudgetCategory {
+  name: string;
+  budgeted: number;
+  spent: number;
+  rollover?: number;
+}
+
+export interface Transaction extends BaseItem {
+  householdId: string;
+  budgetId: string;
+  date: Date;
+  amount: number;
+  category: string;
+  description: string;
+  type: 'income' | 'expense';
+  paymentMethod?: string;
+  receipt?: string;
+  recurring?: boolean;
+  recurrencePattern?: RecurrencePattern;
+  tags: string[];
+  notes?: string;
+  purchased: boolean;
+  purchasedBy?: string;
+  purchasedAt?: Date;
 }
