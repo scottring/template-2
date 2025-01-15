@@ -115,7 +115,7 @@ const useItineraryStore = create<ItineraryState>()(
         // Update streak
         const streak = state.streaks[id] || { count: 0, lastCompletedAt: null };
         const newStreak = {
-          count: completed ? streak.count + 1 : 0,
+          count: completed ? streak.count + 1 : Math.max(0, streak.count - 1),
           lastCompletedAt: completed ? new Date() : streak.lastCompletedAt
         };
         set((state) => ({
@@ -126,12 +126,19 @@ const useItineraryStore = create<ItineraryState>()(
         const progress = state.progress[id] || { completed: 0, total: 0, lastUpdatedAt: new Date() };
         const newProgress = {
           ...progress,
-          completed: completed ? progress.completed + 1 : progress.completed,
+          completed: completed 
+            ? progress.completed + 1 
+            : Math.max(0, progress.completed - 1),
           lastUpdatedAt: new Date()
         };
         set((state) => ({
           progress: { ...state.progress, [id]: newProgress }
         }));
+
+        console.log(`Item ${id} ${completed ? 'completed' : 'uncompleted'}:`, {
+          newStreak,
+          newProgress
+        });
       },
 
       // Goal Integration
@@ -149,13 +156,23 @@ const useItineraryStore = create<ItineraryState>()(
 
         // Then create new habits
         trackedCriteria.forEach(criteria => {
+          // Extract frequency from criteria text (e.g., "Walk 3 times per week")
+          const frequencyMatch = criteria.text.match(/(\d+)\s+times?\s+per\s+(day|week|month|quarter|year)/i);
+          let targetTotal = 1; // Default to 1 if no frequency specified
+
+          if (frequencyMatch) {
+            const [_, count, period] = frequencyMatch;
+            targetTotal = parseInt(count);
+            console.log(`Extracted frequency: ${targetTotal} times per ${period}`);
+          }
+
           // Create a unique ID that includes both goal ID and criteria text
           const itemId = `${goal.id}-${criteria.text}`;
 
           const item: ItineraryItem = {
             id: itemId,
             type: 'habit',
-            referenceId: goal.id, // This is crucial - it links the habit to the goal
+            referenceId: goal.id,
             status: 'pending',
             notes: criteria.text,
             timescale: criteria.timescale
@@ -165,18 +182,19 @@ const useItineraryStore = create<ItineraryState>()(
             id: item.id, 
             referenceId: item.referenceId,
             notes: item.notes,
-            timescale: item.timescale
+            timescale: item.timescale,
+            targetTotal
           });
 
           get().addItem(item);
           
-          // Initialize progress tracking
+          // Initialize progress tracking with the correct target total
           set((state) => ({
             progress: {
               ...state.progress,
               [item.id]: {
                 completed: 0,
-                total: getDefaultTotal(criteria.timescale!),
+                total: targetTotal,
                 lastUpdatedAt: new Date()
               }
             }

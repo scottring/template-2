@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { Goal } from '@/types/models';
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
+import useItineraryStore from './useItineraryStore';
+import { ItineraryItem } from '@/types/models';
 
 interface GoalStore {
   goals: Goal[];
@@ -71,12 +73,49 @@ export const useGoalStore = create<GoalStore>((set) => ({
       throw error;
     }
   },
-  deleteGoal: async (goalId) => {
+  deleteGoal: async (goalId: string) => {
     try {
-      await deleteDoc(doc(db, 'goals', goalId));
+      // Delete from Firebase
+      const docRef = doc(db, 'goals', goalId);
+      await deleteDoc(docRef);
+
+      // Delete from local state
       set((state) => ({
-        goals: state.goals.filter((goal) => goal.id !== goalId),
+        goals: state.goals.filter((goal) => goal.id !== goalId)
       }));
+
+      // Delete associated itinerary items
+      const itineraryStore = useItineraryStore.getState();
+      itineraryStore.items = itineraryStore.items.filter((item: ItineraryItem) => 
+        !(item.referenceId === goalId && item.type === 'habit')
+      );
+
+      // Also clean up any associated progress and streak data
+      const { progress, streaks } = itineraryStore;
+      const updatedProgress = { ...progress };
+      const updatedStreaks = { ...streaks };
+
+      // Remove progress and streak entries for deleted habits
+      Object.keys(progress).forEach(itemId => {
+        if (itemId.startsWith(`${goalId}-`)) {
+          delete updatedProgress[itemId];
+        }
+      });
+
+      Object.keys(streaks).forEach(itemId => {
+        if (itemId.startsWith(`${goalId}-`)) {
+          delete updatedStreaks[itemId];
+        }
+      });
+
+      // Update the itinerary store
+      useItineraryStore.setState({
+        items: itineraryStore.items,
+        progress: updatedProgress,
+        streaks: updatedStreaks
+      });
+
+      console.log(`Goal ${goalId} and associated items deleted successfully`);
     } catch (error) {
       console.error('Error deleting goal:', error);
       throw error;
