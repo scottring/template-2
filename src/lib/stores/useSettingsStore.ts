@@ -3,28 +3,17 @@ import {
   collection, 
   doc, 
   getDoc, 
-  getDocs, 
   setDoc, 
   updateDoc,
-  query, 
-  where,
   onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
-import { MemberPreferences, NotificationPreferences } from '@/types/models';
-import { addDays, addWeeks, startOfWeek, setHours, setMinutes } from 'date-fns';
+import { NotificationPreferences } from '@/types/models';
 
 interface Settings {
-  weeklyPlanningDay: number; // 0-6 for Sunday-Saturday
-  weeklyPlanningTime: string; // HH:mm format
-  autoScheduleItems: boolean;
-  sendReminders: boolean;
-  reminderHoursBefore: number;
-  defaultMeetingTime: string; // HH:mm format
-  defaultMeetingDuration: number; // minutes
-  colorScheme: string;
-  defaultView: 'day' | 'week' | 'month';
   notifications: NotificationPreferences;
+  defaultView: 'day' | 'week' | 'month';
+  colorScheme: 'system' | 'light' | 'dark';
 }
 
 interface SettingsStore {
@@ -37,31 +26,20 @@ interface SettingsStore {
   updateSettings: (updates: Partial<Settings>) => Promise<void>;
   resetSettings: () => Promise<void>;
   
-  // Calculations
-  getNextPlanningSession: () => Date;
-  getNextTeamMeeting: () => Date;
-  
   // Subscriptions
   subscribeToSettings: (userId: string) => () => void;
 }
 
 const defaultSettings: Settings = {
-  weeklyPlanningDay: 0, // Sunday
-  weeklyPlanningTime: '09:00',
-  autoScheduleItems: true,
-  sendReminders: true,
-  reminderHoursBefore: 24,
-  defaultMeetingTime: '10:00',
-  defaultMeetingDuration: 60,
-  colorScheme: 'system',
-  defaultView: 'week',
   notifications: {
     taskReminders: true,
-    planningReminders: true,
-    inventoryAlerts: true,
+    planningReminders: false,
+    inventoryAlerts: false,
     taskAssignments: true,
     reminderHoursBefore: 24
-  }
+  },
+  defaultView: 'week',
+  colorScheme: 'system'
 };
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
@@ -134,42 +112,6 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     } finally {
       set({ isLoading: false });
     }
-  },
-
-  getNextPlanningSession: () => {
-    const { settings } = get();
-    if (!settings) return new Date();
-
-    const now = new Date();
-    const currentWeek = startOfWeek(now);
-    
-    // Get the next planning day this week
-    let nextSession = addDays(currentWeek, settings.weeklyPlanningDay);
-    const [hours, minutes] = settings.weeklyPlanningTime.split(':').map(Number);
-    nextSession = setHours(setMinutes(nextSession, minutes), hours);
-    
-    // If the next session is in the past, move to next week
-    if (nextSession < now) {
-      nextSession = addWeeks(nextSession, 1);
-    }
-    
-    return nextSession;
-  },
-
-  getNextTeamMeeting: () => {
-    const { settings } = get();
-    if (!settings) return new Date();
-
-    const now = new Date();
-    const [hours, minutes] = settings.defaultMeetingTime.split(':').map(Number);
-    let nextMeeting = setHours(setMinutes(now, minutes), hours);
-    
-    // If the next meeting time is in the past, move to tomorrow
-    if (nextMeeting < now) {
-      nextMeeting = addDays(nextMeeting, 1);
-    }
-    
-    return nextMeeting;
   },
 
   subscribeToSettings: (userId) => {
