@@ -1,115 +1,193 @@
 import { create } from 'zustand';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  setDoc, 
+  updateDoc,
+  query, 
+  where,
+  onSnapshot
+} from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
-import { startOfWeek, addDays, parse, format } from 'date-fns';
+import { MemberPreferences, NotificationPreferences } from '@/types/models';
+import { addDays, addWeeks, startOfWeek, setHours, setMinutes } from 'date-fns';
 
-interface PlanningSettings {
+interface Settings {
   weeklyPlanningDay: number; // 0-6 for Sunday-Saturday
-  weeklyPlanningTime?: string; // HH:mm format
-  autoScheduleWeeklyPlanning: boolean;
-  defaultWeeklyMeetingDay?: number;
-  defaultWeeklyMeetingTime?: string;
-  reminderEnabled: boolean;
+  weeklyPlanningTime: string; // HH:mm format
+  autoScheduleItems: boolean;
+  sendReminders: boolean;
   reminderHoursBefore: number;
+  defaultMeetingTime: string; // HH:mm format
+  defaultMeetingDuration: number; // minutes
+  colorScheme: string;
+  defaultView: 'day' | 'week' | 'month';
+  notifications: NotificationPreferences;
 }
 
 interface SettingsStore {
-  settings: PlanningSettings;
+  settings: Settings | null;
   isLoading: boolean;
   error: string | null;
+  
+  // Settings Management
   loadSettings: (userId: string) => Promise<void>;
-  saveSettings: (userId: string, settings: PlanningSettings) => Promise<void>;
-  getNextPlanningDate: () => Date;
-  getNextWeeklyMeetingDate: () => Date | null;
+  updateSettings: (updates: Partial<Settings>) => Promise<void>;
+  resetSettings: () => Promise<void>;
+  
+  // Calculations
+  getNextPlanningSession: () => Date;
+  getNextTeamMeeting: () => Date;
+  
+  // Subscriptions
+  subscribeToSettings: (userId: string) => () => void;
 }
 
-const defaultSettings: PlanningSettings = {
+const defaultSettings: Settings = {
   weeklyPlanningDay: 0, // Sunday
   weeklyPlanningTime: '09:00',
-  autoScheduleWeeklyPlanning: true,
-  reminderEnabled: true,
+  autoScheduleItems: true,
+  sendReminders: true,
   reminderHoursBefore: 24,
+  defaultMeetingTime: '10:00',
+  defaultMeetingDuration: 60,
+  colorScheme: 'system',
+  defaultView: 'week',
+  notifications: {
+    taskReminders: true,
+    planningReminders: true,
+    inventoryAlerts: true,
+    taskAssignments: true,
+    reminderHoursBefore: 24
+  }
 };
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
-  settings: defaultSettings,
-  isLoading: true,
+  settings: null,
+  isLoading: false,
   error: null,
 
-  loadSettings: async (userId: string) => {
+  loadSettings: async (userId) => {
     try {
       set({ isLoading: true, error: null });
-      const settingsDoc = await getDoc(doc(db, 'userSettings', userId));
+      
+      const settingsRef = doc(db, 'settings', userId);
+      const settingsDoc = await getDoc(settingsRef);
       
       if (settingsDoc.exists()) {
-        set({ settings: settingsDoc.data() as PlanningSettings });
+        set({ settings: settingsDoc.data() as Settings });
       } else {
-        // If no settings exist, save and use defaults
-        await setDoc(doc(db, 'userSettings', userId), defaultSettings);
+        // Initialize with default settings
+        await setDoc(settingsRef, defaultSettings);
         set({ settings: defaultSettings });
       }
+
     } catch (error) {
       set({ error: 'Failed to load settings' });
       console.error('Error loading settings:', error);
+      throw error;
     } finally {
       set({ isLoading: false });
     }
   },
 
-  saveSettings: async (userId: string, newSettings: PlanningSettings) => {
+  updateSettings: async (updates) => {
     try {
-      set({ error: null });
-      await setDoc(doc(db, 'userSettings', userId), newSettings);
-      set({ settings: newSettings });
+      set({ isLoading: true, error: null });
+      
+      const { settings } = get();
+      if (!settings) throw new Error('Settings not loaded');
+
+      const updatedSettings = { ...settings, ...updates };
+      const userId = 'TODO'; // TODO: Get current user ID
+      
+      const settingsRef = doc(db, 'settings', userId);
+      await updateDoc(settingsRef, updates);
+      
+      set({ settings: updatedSettings });
+
     } catch (error) {
-      set({ error: 'Failed to save settings' });
-      console.error('Error saving settings:', error);
+      set({ error: 'Failed to update settings' });
+      console.error('Error updating settings:', error);
+      throw error;
+    } finally {
+      set({ isLoading: false });
     }
   },
 
-  getNextPlanningDate: () => {
-    const { settings } = get();
-    const now = new Date();
-    const currentWeekStart = startOfWeek(now);
-    
-    // Get the planning day this week
-    let planningDate = addDays(currentWeekStart, settings.weeklyPlanningDay);
-    
-    // If planning time is set, add it to the date
-    if (settings.weeklyPlanningTime) {
-      const [hours, minutes] = settings.weeklyPlanningTime.split(':').map(Number);
-      planningDate.setHours(hours, minutes, 0, 0);
-    }
+  resetSettings: async () => {
+    try {
+      set({ isLoading: true, error: null });
+      
+      const userId = 'TODO'; // TODO: Get current user ID
+      const settingsRef = doc(db, 'settings', userId);
+      await setDoc(settingsRef, defaultSettings);
+      
+      set({ settings: defaultSettings });
 
-    // If this week's planning date has passed, get next week's
-    if (planningDate < now) {
-      planningDate = addDays(planningDate, 7);
+    } catch (error) {
+      set({ error: 'Failed to reset settings' });
+      console.error('Error resetting settings:', error);
+      throw error;
+    } finally {
+      set({ isLoading: false });
     }
-
-    return planningDate;
   },
 
-  getNextWeeklyMeetingDate: () => {
+  getNextPlanningSession: () => {
     const { settings } = get();
-    if (!settings.defaultWeeklyMeetingDay || !settings.defaultWeeklyMeetingTime) {
-      return null;
-    }
+    if (!settings) return new Date();
 
     const now = new Date();
-    const currentWeekStart = startOfWeek(now);
+    const currentWeek = startOfWeek(now);
     
-    // Get the meeting day this week
-    let meetingDate = addDays(currentWeekStart, settings.defaultWeeklyMeetingDay);
+    // Get the next planning day this week
+    let nextSession = addDays(currentWeek, settings.weeklyPlanningDay);
+    const [hours, minutes] = settings.weeklyPlanningTime.split(':').map(Number);
+    nextSession = setHours(setMinutes(nextSession, minutes), hours);
     
-    // Add the meeting time
-    const [hours, minutes] = settings.defaultWeeklyMeetingTime.split(':').map(Number);
-    meetingDate.setHours(hours, minutes, 0, 0);
-
-    // If this week's meeting has passed, get next week's
-    if (meetingDate < now) {
-      meetingDate = addDays(meetingDate, 7);
+    // If the next session is in the past, move to next week
+    if (nextSession < now) {
+      nextSession = addWeeks(nextSession, 1);
     }
-
-    return meetingDate;
+    
+    return nextSession;
   },
+
+  getNextTeamMeeting: () => {
+    const { settings } = get();
+    if (!settings) return new Date();
+
+    const now = new Date();
+    const [hours, minutes] = settings.defaultMeetingTime.split(':').map(Number);
+    let nextMeeting = setHours(setMinutes(now, minutes), hours);
+    
+    // If the next meeting time is in the past, move to tomorrow
+    if (nextMeeting < now) {
+      nextMeeting = addDays(nextMeeting, 1);
+    }
+    
+    return nextMeeting;
+  },
+
+  subscribeToSettings: (userId) => {
+    const settingsRef = doc(db, 'settings', userId);
+
+    const unsubscribe = onSnapshot(
+      settingsRef,
+      (doc) => {
+        if (doc.exists()) {
+          set({ settings: doc.data() as Settings });
+        }
+      },
+      (error) => {
+        set({ error: 'Failed to subscribe to settings' });
+        console.error('Error subscribing to settings:', error);
+      }
+    );
+
+    return unsubscribe;
+  }
 })); 
