@@ -59,7 +59,7 @@ export interface Task {
   updatedAt: Date;
 }
 
-export interface Habit {
+export interface Routine {
   id: string;
   name: string;
   description: string;
@@ -67,15 +67,18 @@ export interface Habit {
     type: 'daily' | 'weekly' | 'monthly';
     value: number;
   };
-  progress: {
+  progress?: {
     completed: number;
     total: number;
-    streak: number;
   };
+  streak?: number;
   assignedTo: string[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Keeping Habit for backwards compatibility
+export interface Habit extends Routine {}
 
 export interface User {
   id: string;
@@ -91,17 +94,20 @@ export type ItineraryType = 'planning' | 'review';
 
 export interface ItineraryItem {
   id: string;
-  type: 'task' | 'routine' | 'habit' | 'goal' | 'project';
+  type: 'habit' | 'task' | 'event';
   referenceId: string;
-  status: 'pending' | 'completed' | 'deferred' | 'cancelled';
-  notes?: string;
-  parentId?: string;
-  goalId?: string;
+  status: 'pending' | 'completed';
+  notes: string;
+  dueDate?: Date;
+  timescale?: TimeScale;
+  schedule?: {
+    days: number[];  // Array of days (0-6 for Sunday-Saturday)
+    time: string;    // HH:mm format
+    repeat: TimeScale;
+  };
 }
 
 export interface Itinerary {
-  id: string;
-  userId: string;
   type: ItineraryType;
   timeScale: TimeScale;
   date: Date;
