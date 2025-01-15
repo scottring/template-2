@@ -8,16 +8,27 @@ interface ItineraryStore {
   items: ItineraryItem[];
   loading: boolean;
   error: string | null;
+  
+  // Core operations
   addItem: (item: Omit<ItineraryItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   updateItem: (id: string, updates: Partial<ItineraryItem>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
   loadItems: () => Promise<void>;
+  
+  // Schedule management
   updateItemSchedule: (id: string, schedule: Schedule) => Promise<void>;
+  completeItem: (id: string, userId: string) => Promise<void>;
+  clearAllItems: () => Promise<void>;
+  
+  // Item queries
   getActiveHabits: () => ItineraryItem[];
-  getTodayItems: () => ItineraryItem[];
+  getTodayItems: (date?: Date) => ItineraryItem[];
   getItemsForDay: (date: Date) => ItineraryItem[];
   getUpcomingItems: (startDate: Date, endDate: Date) => ItineraryItem[];
   getNeedsAttention: () => ItineraryItem[];
+  getStreak: (itemId: string) => number;
+  
+  // Goal integration
   generateFromGoal: (goal: Goal) => Promise<void>;
 }
 

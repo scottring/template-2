@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { 
   collection, 
   doc, 
+  addDoc,
   getDoc, 
   getDocs, 
   setDoc, 
@@ -10,483 +11,168 @@ import {
   query, 
   where,
   orderBy,
-  onSnapshot,
-  Timestamp,
-  serverTimestamp
+  onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
-import { Task, RecurrencePattern, TaskDependency, TaskHandoff } from '@/types/models';
-import { addDays, addWeeks, addMonths, addYears, isBefore } from 'date-fns';
+import { Task, TaskCategory, Goal, SuccessCriteria } from '@/types/models';
+import useGoalStore from '@/lib/stores/useGoalStore';
 
 interface TaskStore {
   tasks: Task[];
-  isLoading: boolean;
+  loading: boolean;
   error: string | null;
   
-  // Task Management
-  createTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'>) => Promise<string>;
+  // Core task operations
+  fetchTasks: (householdId: string) => Promise<void>;
+  addTask: (task: Partial<Task>) => Promise<void>;
   updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   completeTask: (taskId: string, userId: string) => Promise<void>;
   
-  // Task Dependencies
-  addDependency: (taskId: string, dependentTaskId: string, type: TaskDependency['type'], notes?: string) => Promise<void>;
-  removeDependency: (taskId: string, dependentTaskId: string) => Promise<void>;
-  getBlockedTasks: () => Task[];
-  getDependentTasks: (taskId: string) => Task[];
-  
-  // Task Handoffs
-  requestHandoff: (taskId: string, fromUserId: string, toUserId: string, reason?: string) => Promise<void>;
-  acceptHandoff: (taskId: string, handoffId: string) => Promise<void>;
-  rejectHandoff: (taskId: string, handoffId: string, notes?: string) => Promise<void>;
-  getPendingHandoffs: (userId: string) => TaskHandoff[];
-  
-  // Task Queries
-  getTasksByCategory: (category: Task['category']) => Task[];
+  // Task filtering and organization
+  getTasksByCategory: (category: TaskCategory) => Task[];
   getTasksByAssignee: (userId: string) => Task[];
-  getTasksDueThisWeek: () => Task[];
   getOverdueTasks: () => Task[];
-  
-  // Recurring Tasks
-  createRecurringTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'>, pattern: RecurrencePattern) => Promise<string>;
-  generateNextOccurrence: (taskId: string) => Promise<void>;
-  
-  // Loading
-  loadTasks: (householdId: string) => Promise<void>;
-  subscribeToTasks: (householdId: string) => () => void;
+  getUpcomingTasks: (days: number) => Task[];
 }
 
-export const useTaskStore = create<TaskStore>((set, get) => ({
+const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
-  isLoading: false,
+  loading: false,
   error: null,
 
-  createTask: async (task) => {
+  fetchTasks: async (householdId: string) => {
+    set({ loading: true, error: null });
     try {
-      set({ isLoading: true, error: null });
-      
-      const taskRef = doc(collection(db, 'tasks'));
-      const newTask: Task = {
-        ...task,
-        id: taskRef.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy: 'TODO', // TODO: Get current user ID
-        updatedBy: 'TODO', // TODO: Get current user ID
-        status: 'pending',
-        tags: task.tags || []
-      };
-
-      await setDoc(taskRef, newTask);
-      set(state => ({ tasks: [...state.tasks, newTask] }));
-      
-      return taskRef.id;
+      const q = query(
+        collection(db, 'tasks'),
+        where('householdId', '==', householdId),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const tasks = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Task));
+      set({ tasks, loading: false });
     } catch (error) {
-      set({ error: 'Failed to create task' });
-      console.error('Error creating task:', error);
-      throw error;
-    } finally {
-      set({ isLoading: false });
+      set({ error: 'Failed to fetch tasks', loading: false });
     }
   },
 
-  updateTask: async (taskId, updates) => {
+  addTask: async (task: Partial<Task>) => {
+    set({ loading: true, error: null });
     try {
-      set({ isLoading: true, error: null });
-      
-      const taskRef = doc(db, 'tasks', taskId);
-      await updateDoc(taskRef, {
-        ...updates,
-        updatedAt: new Date(),
-        updatedBy: 'TODO' // TODO: Get current user ID
+      const docRef = await addDoc(collection(db, 'tasks'), {
+        ...task,
+        checklist: [],
+        notes: [],
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
+      const newTask = { ...task, id: docRef.id } as Task;
+      set(state => ({ tasks: [newTask, ...state.tasks], loading: false }));
+    } catch (error) {
+      set({ error: 'Failed to add task', loading: false });
+    }
+  },
 
+  updateTask: async (taskId: string, updates: Partial<Task>) => {
+    set({ loading: true, error: null });
+    try {
+      await updateDoc(doc(db, 'tasks', taskId), {
+        ...updates,
+        updatedAt: new Date()
+      });
       set(state => ({
         tasks: state.tasks.map(task => 
           task.id === taskId ? { ...task, ...updates } : task
-        )
+        ),
+        loading: false
       }));
-
     } catch (error) {
-      set({ error: 'Failed to update task' });
-      console.error('Error updating task:', error);
-      throw error;
-    } finally {
-      set({ isLoading: false });
+      set({ error: 'Failed to update task', loading: false });
     }
   },
 
-  deleteTask: async (taskId) => {
+  deleteTask: async (taskId: string) => {
     try {
-      set({ isLoading: true, error: null });
+      set({ loading: true, error: null });
       
+      // Delete from Firebase
       await deleteDoc(doc(db, 'tasks', taskId));
-      set(state => ({
-        tasks: state.tasks.filter(task => task.id !== taskId)
-      }));
 
-    } catch (error) {
-      set({ error: 'Failed to delete task' });
-      console.error('Error deleting task:', error);
-      throw error;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  completeTask: async (taskId, userId) => {
-    try {
-      set({ isLoading: true, error: null });
-      
+      // Get the task to check if it's linked to a goal
       const task = get().tasks.find(t => t.id === taskId);
-      if (!task) throw new Error('Task not found');
+      
+      // If task is linked to a goal, update the goal's success criteria
+      if (task?.goalId && task?.criteriaId) {
+        const goalStore = useGoalStore.getState();
+        const goal = goalStore.goals.find((g: Goal) => g.id === task.goalId);
+        
+        if (goal) {
+          const updatedCriteria = goal.successCriteria?.map((c: SuccessCriteria) => {
+            if (c.id === task.criteriaId) {
+              return {
+                ...c,
+                tasks: (c.tasks || []).filter((t: { id: string }) => t.id !== taskId)
+              };
+            }
+            return c;
+          });
 
-      // Update task status
-      await updateDoc(doc(db, 'tasks', taskId), {
-        status: 'completed',
-        completedAt: new Date(),
-        updatedAt: new Date(),
-        updatedBy: userId
-      });
-
-      // If task is recurring, generate next occurrence
-      if (task.recurrence) {
-        await get().generateNextOccurrence(taskId);
+          await goalStore.updateGoal(goal.id, {
+            ...goal,
+            successCriteria: updatedCriteria
+          });
+        }
       }
 
+      // Update local state
       set(state => ({
-        tasks: state.tasks.map(t => 
-          t.id === taskId 
-            ? { 
-                ...t, 
-                status: 'completed', 
-                completedAt: new Date() 
-              } 
-            : t
-        )
+        tasks: state.tasks.filter(task => task.id !== taskId),
+        loading: false
       }));
 
     } catch (error) {
-      set({ error: 'Failed to complete task' });
-      console.error('Error completing task:', error);
+      set({ error: 'Failed to delete task', loading: false });
+      console.error('Error deleting task:', error);
       throw error;
-    } finally {
-      set({ isLoading: false });
     }
   },
 
-  getTasksByCategory: (category) => {
+  completeTask: async (taskId: string, userId: string) => {
+    const updates: Partial<Task> = {
+      status: 'completed',
+      completedAt: new Date(),
+      updatedBy: userId,
+      updatedAt: new Date()
+    };
+    await get().updateTask(taskId, updates);
+  },
+
+  getTasksByCategory: (category: TaskCategory) => {
     return get().tasks.filter(task => task.category === category);
   },
 
-  getTasksByAssignee: (userId) => {
+  getTasksByAssignee: (userId: string) => {
     return get().tasks.filter(task => task.assignedTo.includes(userId));
-  },
-
-  getTasksDueThisWeek: () => {
-    const now = new Date();
-    const endOfWeek = addDays(now, 7);
-    return get().tasks.filter(task => 
-      task.dueDate && 
-      isBefore(new Date(task.dueDate), endOfWeek) &&
-      task.status === 'pending'
-    );
   },
 
   getOverdueTasks: () => {
     const now = new Date();
     return get().tasks.filter(task => 
+      task.dueDate && new Date(task.dueDate) < now && task.status !== 'completed'
+    );
+  },
+
+  getUpcomingTasks: (days: number) => {
+    const now = new Date();
+    const future = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    return get().tasks.filter(task =>
       task.dueDate && 
-      isBefore(new Date(task.dueDate), now) &&
-      task.status === 'pending'
-    );
-  },
-
-  createRecurringTask: async (task, pattern) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      const taskRef = doc(collection(db, 'tasks'));
-      const newTask: Task = {
-        ...task,
-        id: taskRef.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy: 'TODO', // TODO: Get current user ID
-        updatedBy: 'TODO', // TODO: Get current user ID
-        status: 'pending',
-        recurrence: pattern,
-        tags: task.tags || []
-      };
-
-      await setDoc(taskRef, newTask);
-      set(state => ({ tasks: [...state.tasks, newTask] }));
-      
-      return taskRef.id;
-    } catch (error) {
-      set({ error: 'Failed to create recurring task' });
-      console.error('Error creating recurring task:', error);
-      throw error;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  generateNextOccurrence: async (taskId) => {
-    const task = get().tasks.find(t => t.id === taskId);
-    if (!task?.recurrence) return;
-
-    try {
-      set({ isLoading: true, error: null });
-      
-      // Calculate next due date based on recurrence pattern
-      let nextDueDate = new Date();
-      const { frequency, interval } = task.recurrence;
-
-      switch (interval) {
-        case 'daily':
-          nextDueDate = addDays(new Date(task.dueDate!), frequency);
-          break;
-        case 'weekly':
-          nextDueDate = addWeeks(new Date(task.dueDate!), frequency);
-          break;
-        case 'monthly':
-          nextDueDate = addMonths(new Date(task.dueDate!), frequency);
-          break;
-        case 'yearly':
-          nextDueDate = addYears(new Date(task.dueDate!), frequency);
-          break;
-      }
-
-      // Create next occurrence
-      const nextTaskRef = doc(collection(db, 'tasks'));
-      const nextTask: Task = {
-        ...task,
-        id: nextTaskRef.id,
-        status: 'pending',
-        dueDate: nextDueDate,
-        completedAt: undefined,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy: task.createdBy,
-        updatedBy: task.updatedBy
-      };
-
-      await setDoc(nextTaskRef, nextTask);
-      set(state => ({ tasks: [...state.tasks, nextTask] }));
-
-    } catch (error) {
-      set({ error: 'Failed to generate next occurrence' });
-      console.error('Error generating next occurrence:', error);
-      throw error;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  loadTasks: async (householdId) => {
-    try {
-      set({ isLoading: true, error: null });
-      
-      const tasksRef = collection(db, 'tasks');
-      const q = query(
-        tasksRef, 
-        where('householdId', '==', householdId),
-        orderBy('dueDate', 'asc')
-      );
-      
-      const querySnapshot = await getDocs(q);
-      const tasks = querySnapshot.docs.map(doc => doc.data() as Task);
-      
-      set({ tasks });
-
-    } catch (error) {
-      set({ error: 'Failed to load tasks' });
-      console.error('Error loading tasks:', error);
-      throw error;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  subscribeToTasks: (householdId) => {
-    const q = query(
-      collection(db, 'tasks'),
-      where('householdId', '==', householdId),
-      orderBy('dueDate', 'asc')
-    );
-
-    const unsubscribe = onSnapshot(
-      q,
-      (querySnapshot) => {
-        const tasks = querySnapshot.docs.map(doc => doc.data() as Task);
-        set({ tasks });
-      },
-      (error) => {
-        set({ error: 'Failed to subscribe to tasks' });
-        console.error('Error subscribing to tasks:', error);
-      }
-    );
-
-    return unsubscribe;
-  },
-
-  // Task Dependencies
-  addDependency: async (taskId, dependentTaskId, type, notes) => {
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      const task = get().tasks.find(t => t.id === taskId);
-      if (!task) throw new Error('Task not found');
-
-      const newDependency = { dependentTaskId, type, notes };
-      const dependencies = [...(task.dependencies || []), newDependency];
-
-      await updateDoc(taskRef, { dependencies });
-      
-      set(state => ({
-        tasks: state.tasks.map(t => 
-          t.id === taskId ? { ...t, dependencies } : t
-        )
-      }));
-    } catch (error) {
-      console.error('Error adding dependency:', error);
-      set({ error: 'Failed to add dependency' });
-    }
-  },
-
-  removeDependency: async (taskId, dependentTaskId) => {
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      const task = get().tasks.find(t => t.id === taskId);
-      if (!task) throw new Error('Task not found');
-
-      const dependencies = task.dependencies.filter(
-        d => d.dependentTaskId !== dependentTaskId
-      );
-
-      await updateDoc(taskRef, { dependencies });
-      
-      set(state => ({
-        tasks: state.tasks.map(t => 
-          t.id === taskId ? { ...t, dependencies } : t
-        )
-      }));
-    } catch (error) {
-      console.error('Error removing dependency:', error);
-      set({ error: 'Failed to remove dependency' });
-    }
-  },
-
-  getBlockedTasks: () => {
-    const { tasks } = get();
-    return tasks.filter(task => (task.blockedBy || []).length > 0);
-  },
-
-  getDependentTasks: (taskId) => {
-    const { tasks } = get();
-    return tasks.filter(task => 
-      task.dependencies.some(d => d.dependentTaskId === taskId)
-    );
-  },
-
-  // Task Handoffs
-  requestHandoff: async (taskId, fromUserId, toUserId, reason) => {
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      const task = get().tasks.find(t => t.id === taskId);
-      if (!task) throw new Error('Task not found');
-
-      const handoff: TaskHandoff = {
-        id: crypto.randomUUID(),
-        fromUserId,
-        toUserId,
-        timestamp: new Date(),
-        reason,
-        status: 'pending',
-      };
-
-      const handoffHistory = [...(task.handoffHistory || []), handoff];
-
-      await updateDoc(taskRef, { handoffHistory });
-      
-      set(state => ({
-        ...state,
-        tasks: state.tasks.map(t => 
-          t.id === taskId ? { ...t, handoffHistory } : t
-        )
-      }));
-    } catch (error) {
-      console.error('Error requesting handoff:', error);
-      set({ error: 'Failed to request handoff' });
-    }
-  },
-
-  acceptHandoff: async (taskId, handoffId) => {
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      const task = get().tasks.find(t => t.id === taskId);
-      if (!task) throw new Error('Task not found');
-
-      const handoffHistory = task.handoffHistory?.map(h => 
-        h.id === handoffId 
-          ? { ...h, status: 'accepted' as const } 
-          : h
-      );
-
-      const handoff = handoffHistory?.find(h => h.id === handoffId);
-      if (!handoff) throw new Error('Handoff not found');
-
-      await updateDoc(taskRef, { 
-        handoffHistory,
-        assignedTo: [handoff.toUserId]
-      });
-      
-      set(state => ({
-        ...state,
-        tasks: state.tasks.map(t => 
-          t.id === taskId 
-            ? { ...t, handoffHistory, assignedTo: [handoff.toUserId] }
-            : t
-        )
-      }));
-    } catch (error) {
-      console.error('Error accepting handoff:', error);
-      set({ error: 'Failed to accept handoff' });
-    }
-  },
-
-  rejectHandoff: async (taskId, handoffId, notes) => {
-    try {
-      const taskRef = doc(db, 'tasks', taskId);
-      const task = get().tasks.find(t => t.id === taskId);
-      if (!task) throw new Error('Task not found');
-
-      const handoffHistory = task.handoffHistory?.map(h => 
-        h.id === handoffId 
-          ? { ...h, status: 'rejected' as const, notes } 
-          : h
-      );
-
-      await updateDoc(taskRef, { handoffHistory });
-      
-      set(state => ({
-        ...state,
-        tasks: state.tasks.map(t => 
-          t.id === taskId ? { ...t, handoffHistory } : t
-        )
-      }));
-    } catch (error) {
-      console.error('Error rejecting handoff:', error);
-      set({ error: 'Failed to reject handoff' });
-    }
-  },
-
-  getPendingHandoffs: (userId) => {
-    const { tasks } = get();
-    return tasks.flatMap(task => 
-      (task.handoffHistory || []).filter(h => 
-        h.status === 'pending' && h.toUserId === userId
-      )
+      new Date(task.dueDate) >= now &&
+      new Date(task.dueDate) <= future &&
+      task.status !== 'completed'
     );
   }
-})); 
+}));
+
+export default useTaskStore; 

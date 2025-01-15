@@ -1,148 +1,143 @@
 import { create } from 'zustand';
-import { Goal } from '@/types/models';
-import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase/firebase';
-import useItineraryStore from './useItineraryStore';
-import { ItineraryItem } from '@/types/models';
+import { 
+  collection, 
+  doc, 
+  addDoc,
+  getDoc, 
+  getDocs, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc,
+  query, 
+  where,
+  orderBy
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase/firebase';
+import { Goal, Task } from '@/types/models';
+import useTaskStore from '@/lib/stores/useTaskStore';
 
 interface GoalStore {
   goals: Goal[];
-  setGoals: (goals: Goal[]) => void;
-  loadGoals: () => Promise<void>;
-  addGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  loading: boolean;
+  error: string | null;
+  
+  // Core goal operations
+  fetchGoals: (householdId: string) => Promise<void>;
+  addGoal: (goal: Partial<Goal>) => Promise<void>;
   updateGoal: (goalId: string, updates: Partial<Goal>) => Promise<void>;
   deleteGoal: (goalId: string) => Promise<void>;
-  subscribeToGoals: () => () => void;
+  
+  // Goal organization
+  getGoalsByArea: (areaId: string) => Goal[];
+  getGoalsByStatus: (status: Goal['status']) => Goal[];
+  getUpcomingGoals: (days: number) => Goal[];
 }
 
-export const useGoalStore = create<GoalStore>((set) => ({
+const useGoalStore = create<GoalStore>((set, get) => ({
   goals: [],
-  setGoals: (goals) => set({ goals }),
-  
-  loadGoals: async () => {
+  loading: false,
+  error: null,
+
+  fetchGoals: async (householdId: string) => {
+    set({ loading: true, error: null });
     try {
-      console.log('Starting to load goals...');
-      const querySnapshot = await getDocs(collection(db, 'goals'));
-      const goals = querySnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          ...data,
-          id: doc.id,
-          createdAt: data.createdAt?.toDate(),
-          updatedAt: data.updatedAt?.toDate(),
-          targetDate: data.targetDate?.toDate(),
-          startDate: data.startDate?.toDate(),
-          successCriteria: data.successCriteria?.map((criteria: any) => ({
-            text: criteria.text || '',
-            isTracked: criteria.isTracked || false,
-            timescale: criteria.timescale,
-            nextOccurrence: criteria.nextOccurrence?.toDate()
-          })) || [],
-        } as Goal;
-      });
-      console.log('Loaded goals:', goals.map(g => ({ id: g.id, name: g.name })));
-      set({ goals });
+      const q = query(
+        collection(db, 'goals'),
+        where('householdId', '==', householdId),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const goals = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Goal));
+      set({ goals, loading: false });
     } catch (error) {
-      console.error('Error loading goals:', error);
-      throw error;
+      set({ error: 'Failed to fetch goals', loading: false });
     }
   },
 
-  subscribeToGoals: () => {
-    const q = query(collection(db, 'goals'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const goals = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          ...data,
-          id: doc.id,
-          createdAt: data.createdAt?.toDate(),
-          updatedAt: data.updatedAt?.toDate(),
-          targetDate: data.targetDate?.toDate(),
-          startDate: data.startDate?.toDate(),
-          successCriteria: data.successCriteria?.map((criteria: any) => ({
-            text: criteria.text || '',
-            isTracked: criteria.isTracked || false,
-            timescale: criteria.timescale,
-            nextOccurrence: criteria.nextOccurrence?.toDate()
-          })) || [],
-        } as Goal;
-      });
-      set({ goals });
-    });
-    return unsubscribe;
-  },
-
-  addGoal: async (goalData) => {
+  addGoal: async (goal: Partial<Goal>) => {
+    set({ loading: true, error: null });
     try {
-      // Clean up successCriteria by removing undefined values
-      const cleanedSuccessCriteria = goalData.successCriteria.map(criteria => ({
-        text: criteria.text || '',
-        isTracked: criteria.isTracked || false,
-        ...(criteria.timescale && { timescale: criteria.timescale }),
-        ...(criteria.nextOccurrence && { nextOccurrence: criteria.nextOccurrence })
-      }));
-
-      const newGoal: Omit<Goal, 'id'> = {
-        ...goalData,
-        successCriteria: cleanedSuccessCriteria,
-        progress: 0,
+      const docRef = await addDoc(collection(db, 'goals'), {
+        ...goal,
+        successCriteria: [],
         createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      const docRef = await addDoc(collection(db, 'goals'), newGoal);
-      return docRef.id; // Return the new goal's ID
+        updatedAt: new Date()
+      });
+      const newGoal = { ...goal, id: docRef.id } as Goal;
+      set(state => ({ goals: [newGoal, ...state.goals], loading: false }));
     } catch (error) {
-      console.error('Error adding goal:', error);
-      throw error;
+      set({ error: 'Failed to add goal', loading: false });
     }
   },
 
-  updateGoal: async (goalId, updates) => {
+  updateGoal: async (goalId: string, updates: Partial<Goal>) => {
+    set({ loading: true, error: null });
     try {
-      const goalRef = doc(db, 'goals', goalId);
-      
-      // Clean up the updates by removing undefined values
-      const cleanedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
-        if (value !== undefined) {
-          acc[key] = value;
-        }
-        return acc;
-      }, {} as Record<string, any>);
-
-      // Add updatedAt
-      const updatedGoal = { ...cleanedUpdates, updatedAt: new Date() };
-      
-      await updateDoc(goalRef, updatedGoal);
+      await updateDoc(doc(db, 'goals', goalId), {
+        ...updates,
+        updatedAt: new Date()
+      });
+      set(state => ({
+        goals: state.goals.map(goal => 
+          goal.id === goalId ? { ...goal, ...updates } : goal
+        ),
+        loading: false
+      }));
     } catch (error) {
-      console.error('Error updating goal:', error);
-      throw error;
+      set({ error: 'Failed to update goal', loading: false });
     }
   },
 
   deleteGoal: async (goalId: string) => {
     try {
-      // Delete from Firebase
-      const docRef = doc(db, 'goals', goalId);
-      await deleteDoc(docRef);
-
-      // Delete associated itinerary items
-      const itineraryStore = useItineraryStore.getState();
-      const updatedItems = itineraryStore.items.filter((item: ItineraryItem) => 
-        !(item.referenceId === goalId && item.type === 'habit')
-      );
-
-      // Update the itinerary store with just the filtered items
-      useItineraryStore.setState({
-        items: updatedItems
-      });
-
-      console.log(`Goal ${goalId} and associated items deleted successfully`);
+      set({ loading: true, error: null });
+      
+      // Get the goal to check for tasks
+      const goal = get().goals.find(g => g.id === goalId);
+      
+      if (goal) {
+        // Delete all tasks associated with this goal
+        const taskStore = useTaskStore.getState();
+        const tasks = taskStore.tasks.filter((t: Task) => t.goalId === goalId);
+        
+        // Delete each task
+        for (const task of tasks) {
+          await taskStore.deleteTask(task.id);
+        }
+        
+        // Delete the goal from Firebase
+        await deleteDoc(doc(db, 'goals', goalId));
+        
+        // Update local state
+        set(state => ({
+          goals: state.goals.filter(goal => goal.id !== goalId),
+          loading: false
+        }));
+      }
     } catch (error) {
+      set({ error: 'Failed to delete goal', loading: false });
       console.error('Error deleting goal:', error);
       throw error;
     }
+  },
+
+  getGoalsByArea: (areaId: string) => {
+    return get().goals.filter(goal => goal.areaId === areaId);
+  },
+
+  getGoalsByStatus: (status: Goal['status']) => {
+    return get().goals.filter(goal => goal.status === status);
+  },
+
+  getUpcomingGoals: (days: number) => {
+    const now = new Date();
+    const future = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    return get().goals.filter(goal =>
+      goal.targetDate && 
+      new Date(goal.targetDate) >= now &&
+      new Date(goal.targetDate) <= future &&
+      goal.status !== 'completed'
+    );
   }
 }));
 
