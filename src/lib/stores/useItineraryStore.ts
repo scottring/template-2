@@ -193,6 +193,17 @@ const useItineraryStore = create<ItineraryState>()(
           // Create a unique ID that includes both goal ID and criteria text
           const itemId = `${goal.id}-${criteria.text}`;
 
+          // Check if this habit already exists
+          const existingItem = state.items.find(item => 
+            item.id === itemId && item.type === 'habit'
+          );
+
+          // If the habit already exists, skip creating it
+          if (existingItem) {
+            console.log('Habit already exists:', itemId);
+            return;
+          }
+
           const item: ItineraryItem = {
             id: itemId,
             type: 'habit',
@@ -238,6 +249,25 @@ const useItineraryStore = create<ItineraryState>()(
       updateFromCriteria: (goalId, criteria) => {
         console.log('Updating criteria for goal:', goalId);
         
+        // Get current state
+        const state = get();
+        
+        // First, preserve any existing progress and streak data
+        const existingItems = state.items.filter(item => 
+          item.referenceId === goalId && item.type === 'habit'
+        );
+        const existingProgress: Record<string, ItemProgress> = {};
+        const existingStreaks: Record<string, StreakData> = {};
+
+        existingItems.forEach(item => {
+          if (state.progress[item.id]) {
+            existingProgress[item.id] = state.progress[item.id];
+          }
+          if (state.streaks[item.id]) {
+            existingStreaks[item.id] = state.streaks[item.id];
+          }
+        });
+
         // Remove old items for this goal
         set((state) => ({
           items: state.items.filter((item) => 
@@ -249,10 +279,21 @@ const useItineraryStore = create<ItineraryState>()(
         criteria.filter(c => c.isTracked && c.timescale).forEach(c => {
           const itemId = `${goalId}-${c.text}`;
           
+          // Check if this habit already exists
+          const existingItem = state.items.find(item => 
+            item.id === itemId && item.type === 'habit'
+          );
+
+          // If the habit already exists, skip creating it
+          if (existingItem) {
+            console.log('Habit already exists:', itemId);
+            return;
+          }
+
           const item: ItineraryItem = {
             id: itemId,
             type: 'habit',
-            referenceId: goalId, // Ensure referenceId is set
+            referenceId: goalId,
             status: 'pending',
             notes: c.text,
             timescale: c.timescale
@@ -266,6 +307,25 @@ const useItineraryStore = create<ItineraryState>()(
           });
 
           get().addItem(item);
+
+          // Restore existing progress and streak data or initialize new ones
+          set((state) => ({
+            progress: {
+              ...state.progress,
+              [item.id]: existingProgress[item.id] || {
+                completed: 0,
+                total: getDefaultTotal(c.timescale!),
+                lastUpdatedAt: new Date()
+              }
+            },
+            streaks: {
+              ...state.streaks,
+              [item.id]: existingStreaks[item.id] || {
+                count: 0,
+                lastCompletedAt: null
+              }
+            }
+          }));
         });
       },
 

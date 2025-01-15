@@ -25,9 +25,9 @@ export interface Goal {
 
 export interface SuccessCriteria {
   text: string;
-  isTracked: boolean;
+  frequency?: number;
   timescale?: TimeScale;
-  nextOccurrence?: Date;
+  isTracked?: boolean;
 }
 
 export interface Project {
