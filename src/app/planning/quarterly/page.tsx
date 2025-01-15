@@ -62,11 +62,10 @@ export default function QuarterlyPlanningPage() {
   const currentGoal = goals[session.currentGoalIndex];
 
   const handleSchedule = (scheduleConfig: ScheduleConfig) => {
-    if (selectedItem) {
+    if (selectedItem && session.markedItems.has(selectedItem.id)) {
       // Convert the new schedule format to the old format
       const schedule: ItineraryItem['schedule'] = {
-        days: scheduleConfig.schedules.map(s => s.day),
-        time: scheduleConfig.schedules[0].time, // Use the first time for backward compatibility
+        schedules: scheduleConfig.schedules,
         repeat: scheduleConfig.repeat
       };
 

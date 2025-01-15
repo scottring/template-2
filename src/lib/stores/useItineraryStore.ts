@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { ItineraryItem, Schedule, TimeScale, Goal, SuccessCriteria } from '@/types/models';
-import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { startOfDay, endOfDay, addDays, isSameDay, isWithinInterval } from 'date-fns';
 
@@ -100,18 +100,56 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
 
   updateItemSchedule: async (id, schedule) => {
     try {
+      // Split the composite ID to get the goal ID and criteria text
+      const [goalId, ...criteriaParts] = id.split('-');
+      const criteriaText = criteriaParts.join('-');
+
+      // First check if the document exists
       const docRef = doc(db, 'itinerary', id);
-      await updateDoc(docRef, {
-        schedule,
-        updatedAt: new Date(),
-      });
-      set(state => ({
-        items: state.items.map(item =>
-          item.id === id
-            ? { ...item, schedule, updatedAt: new Date() }
-            : item
-        ),
-      }));
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        // If document doesn't exist, create it first
+        await setDoc(docRef, {
+          id,
+          notes: criteriaText,
+          referenceId: goalId,
+          schedule,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          status: 'pending',
+          type: 'habit'
+        });
+
+        // Update local state
+        set(state => ({
+          items: [...state.items, {
+            id,
+            notes: criteriaText,
+            referenceId: goalId,
+            schedule,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            status: 'pending',
+            type: 'habit'
+          }],
+        }));
+      } else {
+        // Document exists, just update the schedule
+        await updateDoc(docRef, {
+          schedule,
+          updatedAt: new Date(),
+        });
+
+        // Update local state
+        set(state => ({
+          items: state.items.map(item =>
+            item.id === id
+              ? { ...item, schedule, updatedAt: new Date() }
+              : item
+          ),
+        }));
+      }
     } catch (error) {
       console.error('Error updating item schedule:', error);
       throw error;
