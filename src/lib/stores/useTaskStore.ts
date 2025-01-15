@@ -15,7 +15,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
-import { Task, RecurrencePattern } from '@/types/models';
+import { Task, RecurrencePattern, TaskDependency, TaskHandoff } from '@/types/models';
 import { addDays, addWeeks, addMonths, addYears, isBefore } from 'date-fns';
 
 interface TaskStore {
@@ -28,6 +28,18 @@ interface TaskStore {
   updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   completeTask: (taskId: string, userId: string) => Promise<void>;
+  
+  // Task Dependencies
+  addDependency: (taskId: string, dependentTaskId: string, type: TaskDependency['type'], notes?: string) => Promise<void>;
+  removeDependency: (taskId: string, dependentTaskId: string) => Promise<void>;
+  getBlockedTasks: () => Task[];
+  getDependentTasks: (taskId: string) => Task[];
+  
+  // Task Handoffs
+  requestHandoff: (taskId: string, fromUserId: string, toUserId: string, reason?: string) => Promise<void>;
+  acceptHandoff: (taskId: string, handoffId: string) => Promise<void>;
+  rejectHandoff: (taskId: string, handoffId: string, notes?: string) => Promise<void>;
+  getPendingHandoffs: (userId: string) => TaskHandoff[];
   
   // Task Queries
   getTasksByCategory: (category: Task['category']) => Task[];
@@ -317,5 +329,164 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     );
 
     return unsubscribe;
+  },
+
+  // Task Dependencies
+  addDependency: async (taskId, dependentTaskId, type, notes) => {
+    try {
+      const taskRef = doc(db, 'tasks', taskId);
+      const task = get().tasks.find(t => t.id === taskId);
+      if (!task) throw new Error('Task not found');
+
+      const newDependency = { dependentTaskId, type, notes };
+      const dependencies = [...(task.dependencies || []), newDependency];
+
+      await updateDoc(taskRef, { dependencies });
+      
+      set(state => ({
+        tasks: state.tasks.map(t => 
+          t.id === taskId ? { ...t, dependencies } : t
+        )
+      }));
+    } catch (error) {
+      console.error('Error adding dependency:', error);
+      set({ error: 'Failed to add dependency' });
+    }
+  },
+
+  removeDependency: async (taskId, dependentTaskId) => {
+    try {
+      const taskRef = doc(db, 'tasks', taskId);
+      const task = get().tasks.find(t => t.id === taskId);
+      if (!task) throw new Error('Task not found');
+
+      const dependencies = task.dependencies.filter(
+        d => d.dependentTaskId !== dependentTaskId
+      );
+
+      await updateDoc(taskRef, { dependencies });
+      
+      set(state => ({
+        tasks: state.tasks.map(t => 
+          t.id === taskId ? { ...t, dependencies } : t
+        )
+      }));
+    } catch (error) {
+      console.error('Error removing dependency:', error);
+      set({ error: 'Failed to remove dependency' });
+    }
+  },
+
+  getBlockedTasks: () => {
+    const { tasks } = get();
+    return tasks.filter(task => (task.blockedBy || []).length > 0);
+  },
+
+  getDependentTasks: (taskId) => {
+    const { tasks } = get();
+    return tasks.filter(task => 
+      task.dependencies.some(d => d.dependentTaskId === taskId)
+    );
+  },
+
+  // Task Handoffs
+  requestHandoff: async (taskId, fromUserId, toUserId, reason) => {
+    try {
+      const taskRef = doc(db, 'tasks', taskId);
+      const task = get().tasks.find(t => t.id === taskId);
+      if (!task) throw new Error('Task not found');
+
+      const handoff: TaskHandoff = {
+        id: crypto.randomUUID(),
+        fromUserId,
+        toUserId,
+        timestamp: new Date(),
+        reason,
+        status: 'pending',
+      };
+
+      const handoffHistory = [...(task.handoffHistory || []), handoff];
+
+      await updateDoc(taskRef, { handoffHistory });
+      
+      set(state => ({
+        ...state,
+        tasks: state.tasks.map(t => 
+          t.id === taskId ? { ...t, handoffHistory } : t
+        )
+      }));
+    } catch (error) {
+      console.error('Error requesting handoff:', error);
+      set({ error: 'Failed to request handoff' });
+    }
+  },
+
+  acceptHandoff: async (taskId, handoffId) => {
+    try {
+      const taskRef = doc(db, 'tasks', taskId);
+      const task = get().tasks.find(t => t.id === taskId);
+      if (!task) throw new Error('Task not found');
+
+      const handoffHistory = task.handoffHistory?.map(h => 
+        h.id === handoffId 
+          ? { ...h, status: 'accepted' as const } 
+          : h
+      );
+
+      const handoff = handoffHistory?.find(h => h.id === handoffId);
+      if (!handoff) throw new Error('Handoff not found');
+
+      await updateDoc(taskRef, { 
+        handoffHistory,
+        assignedTo: [handoff.toUserId]
+      });
+      
+      set(state => ({
+        ...state,
+        tasks: state.tasks.map(t => 
+          t.id === taskId 
+            ? { ...t, handoffHistory, assignedTo: [handoff.toUserId] }
+            : t
+        )
+      }));
+    } catch (error) {
+      console.error('Error accepting handoff:', error);
+      set({ error: 'Failed to accept handoff' });
+    }
+  },
+
+  rejectHandoff: async (taskId, handoffId, notes) => {
+    try {
+      const taskRef = doc(db, 'tasks', taskId);
+      const task = get().tasks.find(t => t.id === taskId);
+      if (!task) throw new Error('Task not found');
+
+      const handoffHistory = task.handoffHistory?.map(h => 
+        h.id === handoffId 
+          ? { ...h, status: 'rejected' as const, notes } 
+          : h
+      );
+
+      await updateDoc(taskRef, { handoffHistory });
+      
+      set(state => ({
+        ...state,
+        tasks: state.tasks.map(t => 
+          t.id === taskId ? { ...t, handoffHistory } : t
+        )
+      }));
+    } catch (error) {
+      console.error('Error rejecting handoff:', error);
+      set({ error: 'Failed to reject handoff' });
+    }
+  },
+
+  getPendingHandoffs: (userId) => {
+    const { tasks } = get();
+    return tasks.flatMap(task => 
+      (task.handoffHistory || []).filter(h => 
+        h.status === 'pending' && h.toUserId === userId
+      )
+    );
   }
 })); 
