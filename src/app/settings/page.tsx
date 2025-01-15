@@ -241,6 +241,195 @@ export default function SettingsPage() {
         </div>
       </Card>
 
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Appearance</h2>
+        
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <Label>Color Scheme</Label>
+            <Select
+              value={settings.colorScheme}
+              onValueChange={(value) => 
+                useSettingsStore.setState(state => ({
+                  ...state,
+                  settings: state.settings ? {
+                    ...state.settings,
+                    colorScheme: value
+                  } : null
+                }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select color scheme" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="system">System</SelectItem>
+                <SelectItem value="light">Light</SelectItem>
+                <SelectItem value="dark">Dark</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-gray-500">
+              Choose your preferred color scheme
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Default Calendar View</Label>
+            <Select
+              value={settings.defaultView}
+              onValueChange={(value) => 
+                useSettingsStore.setState(state => ({
+                  ...state,
+                  settings: state.settings ? {
+                    ...state.settings,
+                    defaultView: value as 'day' | 'week' | 'month'
+                  } : null
+                }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select default view" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">Day</SelectItem>
+                <SelectItem value="week">Week</SelectItem>
+                <SelectItem value="month">Month</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-gray-500">
+              Choose your preferred calendar view
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Notifications</h2>
+        
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label>Task Reminders</Label>
+              <p className="text-sm text-gray-500">
+                Get notified about upcoming tasks
+              </p>
+            </div>
+            <Switch
+              checked={settings.notifications.taskReminders}
+              onCheckedChange={(checked) =>
+                useSettingsStore.setState(state => ({
+                  ...state,
+                  settings: state.settings ? {
+                    ...state.settings,
+                    notifications: {
+                      ...state.settings.notifications,
+                      taskReminders: checked
+                    }
+                  } : null
+                }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label>Planning Reminders</Label>
+              <p className="text-sm text-gray-500">
+                Get notified about planning sessions
+              </p>
+            </div>
+            <Switch
+              checked={settings.notifications.planningReminders}
+              onCheckedChange={(checked) =>
+                useSettingsStore.setState(state => ({
+                  ...state,
+                  settings: state.settings ? {
+                    ...state.settings,
+                    notifications: {
+                      ...state.settings.notifications,
+                      planningReminders: checked
+                    }
+                  } : null
+                }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label>Task Assignments</Label>
+              <p className="text-sm text-gray-500">
+                Get notified when tasks are assigned to you
+              </p>
+            </div>
+            <Switch
+              checked={settings.notifications.taskAssignments}
+              onCheckedChange={(checked) =>
+                useSettingsStore.setState(state => ({
+                  ...state,
+                  settings: state.settings ? {
+                    ...state.settings,
+                    notifications: {
+                      ...state.settings.notifications,
+                      taskAssignments: checked
+                    }
+                  } : null
+                }))
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <Label>Inventory Alerts</Label>
+              <p className="text-sm text-gray-500">
+                Get notified about low inventory items
+              </p>
+            </div>
+            <Switch
+              checked={settings.notifications.inventoryAlerts}
+              onCheckedChange={(checked) =>
+                useSettingsStore.setState(state => ({
+                  ...state,
+                  settings: state.settings ? {
+                    ...state.settings,
+                    notifications: {
+                      ...state.settings.notifications,
+                      inventoryAlerts: checked
+                    }
+                  } : null
+                }))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Default Reminder Time</Label>
+            <Input
+              type="number"
+              min="1"
+              max="72"
+              value={settings.notifications.reminderHoursBefore}
+              onChange={(e) =>
+                useSettingsStore.setState(state => ({
+                  ...state,
+                  settings: state.settings ? {
+                    ...state.settings,
+                    notifications: {
+                      ...state.settings.notifications,
+                      reminderHoursBefore: parseInt(e.target.value) || 24
+                    }
+                  } : null
+                }))
+              }
+            />
+            <p className="text-sm text-gray-500">
+              Hours before to send reminders (1-72 hours)
+            </p>
+          </div>
+        </div>
+      </Card>
+
       <div className="flex justify-end">
         <Button onClick={handleSave}>
           Save Settings
