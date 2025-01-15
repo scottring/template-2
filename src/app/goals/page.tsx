@@ -3,15 +3,26 @@
 import { useGoalStore } from '@/lib/stores/useGoalStore';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Share2 } from 'lucide-react';
+import { Share2, Trash2 } from 'lucide-react';
 import { SharedIndicator } from '@/components/shared/SharedIndicator';
 import { ShareDialog } from '@/components/shared/ShareDialog';
 import { Goal } from '@/types/models';
 
 export default function GoalsPage() {
   const goals = useGoalStore((state) => state.goals);
+  const deleteGoal = useGoalStore((state) => state.deleteGoal);
   const [sharingGoal, setSharingGoal] = useState<Goal | null>(null);
   const router = useRouter();
+
+  const handleDeleteGoal = async (goalId: string) => {
+    if (window.confirm('Are you sure you want to delete this goal? This action cannot be undone.')) {
+      try {
+        await deleteGoal(goalId);
+      } catch (error) {
+        console.error('Error deleting goal:', error);
+      }
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -58,6 +69,14 @@ export default function GoalsPage() {
               >
                 <Share2 className="h-4 w-4" />
                 Share
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteGoal(goal.id)}
+                className="flex w-full items-center justify-center gap-x-2.5 p-3 text-sm font-semibold text-red-600 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
               </button>
             </div>
           </div>

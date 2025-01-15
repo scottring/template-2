@@ -125,7 +125,7 @@ export function Dashboard({ children }: { children: React.ReactNode }) {
       <div className="w-64 border-r bg-white dark:bg-gray-800">
         <div className="flex h-full flex-col">
           <div className="flex h-16 items-center border-b">
-            <Link href="/" className="flex items-center gap-2 pl-3">
+            <Link href="/" className="flex items-center gap-2 px-3">
               <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-100">
                 <Music2 className="h-5 w-5 text-blue-600" />
               </div>
@@ -135,7 +135,7 @@ export function Dashboard({ children }: { children: React.ReactNode }) {
               </div>
             </Link>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
+          <nav className="flex-1 space-y-1 px-3 py-4">
             {navigation.map(item => renderNavItem(item))}
           </nav>
         </div>

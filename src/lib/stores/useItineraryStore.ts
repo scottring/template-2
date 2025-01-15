@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ItineraryItem, Schedule, TimeScale } from '@/types/models';
+import { ItineraryItem, Schedule, TimeScale, Goal, SuccessCriteria } from '@/types/models';
 import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { startOfDay, endOfDay, addDays, isSameDay, isWithinInterval } from 'date-fns';
@@ -16,6 +16,9 @@ interface ItineraryStore {
   getActiveHabits: () => ItineraryItem[];
   getTodayItems: () => ItineraryItem[];
   getItemsForDay: (date: Date) => ItineraryItem[];
+  getUpcomingItems: (startDate: Date, endDate: Date) => ItineraryItem[];
+  getNeedsAttention: () => ItineraryItem[];
+  generateFromGoal: (goal: Goal) => Promise<void>;
 }
 
 const useItineraryStore = create<ItineraryStore>((set, get) => ({
@@ -223,6 +226,107 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
 
       return false;
     });
+  },
+
+  getUpcomingItems: (startDate: Date, endDate: Date) => {
+    const { items } = get();
+    const dayStart = startOfDay(startDate);
+    const dayEnd = endOfDay(endDate);
+
+    return items.filter(item => {
+      if (item.status === 'completed') return false;
+
+      // Check due date if it exists
+      if (item.dueDate) {
+        return isWithinInterval(item.dueDate, { start: dayStart, end: dayEnd });
+      }
+
+      // Check schedule if it exists
+      if (item.schedule) {
+        const { schedules, repeat } = item.schedule;
+        return schedules.some(schedule => {
+          const scheduleDate = new Date(startDate);
+          scheduleDate.setHours(parseInt(schedule.time.split(':')[0]), parseInt(schedule.time.split(':')[1]));
+          return isWithinInterval(scheduleDate, { start: dayStart, end: dayEnd });
+        });
+      }
+
+      return false;
+    });
+  },
+
+  getNeedsAttention: () => {
+    const { items } = get();
+    const today = new Date();
+    const todayStart = startOfDay(today);
+
+    return items.filter(item => {
+      if (item.status === 'completed') return false;
+
+      // Check for overdue items
+      if (item.dueDate && item.dueDate < todayStart) {
+        return true;
+      }
+
+      // Check for items with missed schedules
+      if (item.schedule) {
+        const { schedules, repeat } = item.schedule;
+        const lastUpdate = item.updatedAt ? startOfDay(item.updatedAt) : null;
+
+        if (!lastUpdate) return true; // Never updated items need attention
+
+        // Calculate next due date based on repeat frequency
+        let nextDue = new Date(lastUpdate);
+        switch (repeat) {
+          case 'daily':
+            nextDue = addDays(lastUpdate, 1);
+            break;
+          case 'weekly':
+            nextDue = addDays(lastUpdate, 7);
+            break;
+          case 'monthly':
+            nextDue.setMonth(nextDue.getMonth() + 1);
+            break;
+          case 'quarterly':
+            nextDue.setMonth(nextDue.getMonth() + 3);
+            break;
+        }
+
+        // If we're past the next due date, this item needs attention
+        if (today >= nextDue) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+  },
+
+  generateFromGoal: async (goal: Goal) => {
+    try {
+      const { addItem } = get();
+      
+      // Generate habits from tracked success criteria
+      const trackedCriteria = goal.successCriteria.filter(criteria => criteria.isTracked);
+      
+      for (const criteria of trackedCriteria) {
+        const habitData: Omit<ItineraryItem, 'id' | 'createdAt' | 'updatedAt'> = {
+          type: 'habit',
+          referenceId: goal.id,
+          notes: criteria.text,
+          status: 'pending',
+          schedule: {
+            schedules: [{ day: new Date().getDay(), time: '09:00' }],
+            repeat: criteria.timescale || 'weekly'
+          }
+        };
+
+        await addItem(habitData);
+      }
+    } catch (error) {
+      console.error('Error generating habits from goal:', error);
+      throw error;
+    }
   },
 }));
 
