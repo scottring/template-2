@@ -1,15 +1,14 @@
-'use client';
-
 import { Inter } from 'next/font/google';
-import './globals.css';
 import { RootProvider } from '@/components/providers/RootProvider';
+import { Dashboard } from '@/components/dashboard/Dashboard';
 import { Toaster } from '@/components/ui/toaster';
+import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'Symphony - Orchestrate Your Life',
-  description: 'A powerful tool for collaborative life planning and goal achievement.',
+  title: 'Symphony Planner',
+  description: 'A family task management and planning tool',
 };
 
 export default function RootLayout({
@@ -21,7 +20,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <RootProvider>
-          {children}
+          <Dashboard>
+            {children}
+          </Dashboard>
           <Toaster />
         </RootProvider>
       </body>

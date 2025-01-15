@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 export default function SettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { settings, isLoading, error, loadSettings, saveSettings, getNextPlanningDate, getNextWeeklyMeetingDate } = useSettingsStore();
+  const { settings, isLoading, error, loadSettings, saveSettings, getNextPlanningSession, getNextTeamMeeting } = useSettingsStore();
 
   useEffect(() => {
     if (user) {
@@ -24,7 +24,7 @@ export default function SettingsPage() {
   }, [user, loadSettings]);
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !settings) return;
 
     try {
       await saveSettings(user.uid, settings);
@@ -41,9 +41,9 @@ export default function SettingsPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !settings) {
     return (
-      <div className="container mx-auto py-6">
+      <div className="p-6">
         <div className="text-center">
           <p>Loading settings...</p>
         </div>
@@ -51,11 +51,11 @@ export default function SettingsPage() {
     );
   }
 
-  const nextPlanningDate = getNextPlanningDate();
-  const nextMeetingDate = getNextWeeklyMeetingDate();
+  const nextPlanningDate = getNextPlanningSession();
+  const nextMeetingDate = getNextTeamMeeting();
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="p-6 space-y-6">
       <div className="border-b pb-4">
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-gray-600 mt-2">Configure your planning preferences</p>
@@ -72,7 +72,11 @@ export default function SettingsPage() {
                 value={settings.weeklyPlanningDay.toString()}
                 onValueChange={(value) => 
                   useSettingsStore.setState(state => ({
-                    settings: { ...state.settings, weeklyPlanningDay: parseInt(value) }
+                    ...state,
+                    settings: state.settings ? {
+                      ...state.settings,
+                      weeklyPlanningDay: parseInt(value)
+                    } : null
                   }))
                 }
               >
@@ -101,7 +105,11 @@ export default function SettingsPage() {
                 value={settings.weeklyPlanningTime}
                 onChange={(e) => 
                   useSettingsStore.setState(state => ({
-                    settings: { ...state.settings, weeklyPlanningTime: e.target.value }
+                    ...state,
+                    settings: state.settings ? {
+                      ...state.settings,
+                      weeklyPlanningTime: e.target.value
+                    } : null
                   }))
                 }
               />
@@ -117,9 +125,13 @@ export default function SettingsPage() {
             </div>
             <Switch
               checked={settings.autoScheduleWeeklyPlanning}
-              onCheckedChange={(checked: boolean) =>
+              onCheckedChange={(checked) =>
                 useSettingsStore.setState(state => ({
-                  settings: { ...state.settings, autoScheduleWeeklyPlanning: checked }
+                  ...state,
+                  settings: state.settings ? {
+                    ...state.settings,
+                    autoScheduleWeeklyPlanning: checked
+                  } : null
                 }))
               }
             />
@@ -134,9 +146,13 @@ export default function SettingsPage() {
             </div>
             <Switch
               checked={settings.reminderEnabled}
-              onCheckedChange={(checked: boolean) =>
+              onCheckedChange={(checked) =>
                 useSettingsStore.setState(state => ({
-                  settings: { ...state.settings, reminderEnabled: checked }
+                  ...state,
+                  settings: state.settings ? {
+                    ...state.settings,
+                    reminderEnabled: checked
+                  } : null
                 }))
               }
             />
@@ -151,11 +167,12 @@ export default function SettingsPage() {
                 max="72"
                 value={settings.reminderHoursBefore}
                 onChange={(e) =>
-                  useSettingsStore.setState(state => ({ 
-                    settings: { 
-                      ...state.settings, 
+                  useSettingsStore.setState(state => ({
+                    ...state,
+                    settings: state.settings ? {
+                      ...state.settings,
                       reminderHoursBefore: parseInt(e.target.value) || 24
-                    }
+                    } : null
                   }))
                 }
               />
@@ -172,13 +189,14 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label>Default Meeting Day</Label>
               <Select
-                value={settings.defaultWeeklyMeetingDay?.toString() || ''}
+                value={settings.defaultWeeklyMeetingDay?.toString() || 'none'}
                 onValueChange={(value) => 
-                  useSettingsStore.setState(state => ({ 
-                    settings: { 
-                      ...state.settings, 
-                      defaultWeeklyMeetingDay: value ? parseInt(value) : undefined 
-                    }
+                  useSettingsStore.setState(state => ({
+                    ...state,
+                    settings: state.settings ? {
+                      ...state.settings,
+                      defaultWeeklyMeetingDay: value === 'none' ? null : parseInt(value)
+                    } : null
                   }))
                 }
               >
@@ -186,7 +204,7 @@ export default function SettingsPage() {
                   <SelectValue placeholder="Select a day" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Not Set</SelectItem>
+                  <SelectItem value="none">Not Set</SelectItem>
                   <SelectItem value="0">Sunday</SelectItem>
                   <SelectItem value="1">Monday</SelectItem>
                   <SelectItem value="2">Tuesday</SelectItem>
@@ -209,11 +227,12 @@ export default function SettingsPage() {
                 type="time"
                 value={settings.defaultWeeklyMeetingTime || ''}
                 onChange={(e) => 
-                  useSettingsStore.setState(state => ({ 
-                    settings: { 
-                      ...state.settings, 
-                      defaultWeeklyMeetingTime: e.target.value || undefined 
-                    }
+                  useSettingsStore.setState(state => ({
+                    ...state,
+                    settings: state.settings ? {
+                      ...state.settings,
+                      defaultWeeklyMeetingTime: e.target.value || null
+                    } : null
                   }))
                 }
               />
