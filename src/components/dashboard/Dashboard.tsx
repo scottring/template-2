@@ -26,7 +26,6 @@ const Dashboard: React.FC<DashboardProps> = ({ children }) => {
                     {links.map((link) => (
                         <SidebarLink 
                             key={link.href} 
-                            href={link.href}
                             link={link}
                         />
                     ))}
