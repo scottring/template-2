@@ -14,12 +14,20 @@ export interface Goal {
   areaId: string;
   name: string;
   description: string;
-  successCriteria: string[];
+  successCriteria: SuccessCriteria[];
+  startDate: Date;
   targetDate: Date;
   progress: number;
   assignedTo: string[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface SuccessCriteria {
+  text: string;
+  isTracked: boolean;
+  timescale?: TimeScale;
+  nextOccurrence?: Date;
 }
 
 export interface Project {

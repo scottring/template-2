@@ -5,6 +5,7 @@ import { Dialog, Transition } from '@headlessui/react';
 import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon } from 'lucide-react';
 import { useGoalStore } from '@/lib/stores/useGoalStore';
 import { Goal } from '@/types/models';
+import { getNextOccurrence } from '@/lib/utils/itineraryGeneration';
 
 interface SuccessCriteria {
   text: string;
@@ -20,39 +21,71 @@ interface EditGoalDialogProps {
 
 export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
   const updateGoal = useGoalStore((state) => state.updateGoal);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string;
+    startDate: Date | null;
+    targetDate: Date | null;
+    successCriteria: SuccessCriteria[];
+    progress: number;
+  }>({
     name: '',
     description: '',
-    targetDate: new Date(),
-    successCriteria: [] as SuccessCriteria[],
+    startDate: null,
+    targetDate: null,
+    successCriteria: [],
     progress: 0,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (goal) {
-      setFormData({
-        name: goal.name,
-        description: goal.description,
-        targetDate: goal.targetDate,
-        successCriteria: goal.successCriteria.map(criteria => ({
-          text: criteria,
-          isTracked: false,
-          timescale: undefined,
-        })),
-        progress: goal.progress,
-      });
-    }
+    if (!goal) return;
+    
+    const startDate = goal.startDate ? new Date(goal.startDate) : null;
+    const targetDate = goal.targetDate ? new Date(goal.targetDate) : null;
+    
+    setFormData({
+      name: goal.name || '',
+      description: goal.description || '',
+      startDate,
+      targetDate,
+      successCriteria: Array.isArray(goal.successCriteria) 
+        ? goal.successCriteria.map(criteria => {
+            if (typeof criteria === 'string') {
+              return {
+                text: criteria,
+                isTracked: false,
+                timescale: undefined,
+              };
+            }
+            return criteria;
+          })
+        : [],
+      progress: goal.progress || 0,
+    });
   }, [goal]);
+
+  if (!goal) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.startDate || !formData.targetDate) return;
+    
     setIsSubmitting(true);
 
     try {
       await updateGoal(goal.id, {
         ...formData,
-        successCriteria: formData.successCriteria.map(c => c.text).filter(Boolean),
+        startDate: formData.startDate,
+        targetDate: formData.targetDate,
+        successCriteria: formData.successCriteria.map(c => ({
+          text: c.text,
+          isTracked: c.isTracked,
+          timescale: c.timescale,
+          nextOccurrence: c.isTracked && formData.startDate
+            ? getNextOccurrence(formData.startDate, c.timescale || 'weekly')
+            : undefined,
+        })),
       });
       onClose();
     } catch (error) {
@@ -65,7 +98,11 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
   const addCriteria = () => {
     setFormData((prev) => ({
       ...prev,
-      successCriteria: [...prev.successCriteria, { text: '', isTracked: false }],
+      successCriteria: [...prev.successCriteria, { 
+        text: '',
+        isTracked: false,
+        timescale: undefined,
+      }],
     }));
   };
 
@@ -162,20 +199,40 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                           </div>
                         </div>
 
-                        <div>
-                          <label htmlFor="targetDate" className="block text-sm font-medium leading-6 text-gray-900">
-                            End/Target Date
-                          </label>
-                          <div className="mt-2">
-                            <input
-                              type="date"
-                              name="targetDate"
-                              id="targetDate"
-                              required
-                              value={formData.targetDate.toISOString().split('T')[0]}
-                              onChange={(e) => setFormData((prev) => ({ ...prev, targetDate: new Date(e.target.value) }))}
-                              className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label htmlFor="startDate" className="block text-sm font-medium leading-6 text-gray-900">
+                              Start On
+                            </label>
+                            <div className="mt-2">
+                              <input
+                                type="date"
+                                name="startDate"
+                                id="startDate"
+                                required
+                                value={formData.startDate?.toISOString().split('T')[0] || ''}
+                                onChange={(e) => setFormData((prev) => ({ ...prev, startDate: new Date(e.target.value) }))}
+                                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label htmlFor="targetDate" className="block text-sm font-medium leading-6 text-gray-900">
+                              End/Target Date
+                            </label>
+                            <div className="mt-2">
+                              <input
+                                type="date"
+                                name="targetDate"
+                                id="targetDate"
+                                required
+                                min={formData.startDate?.toISOString().split('T')[0] || ''}
+                                value={formData.targetDate?.toISOString().split('T')[0] || ''}
+                                onChange={(e) => setFormData((prev) => ({ ...prev, targetDate: new Date(e.target.value) }))}
+                                className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                              />
+                            </div>
                           </div>
                         </div>
 
