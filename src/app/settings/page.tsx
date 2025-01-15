@@ -15,7 +15,7 @@ import { format } from 'date-fns';
 export default function SettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { settings, isLoading, error, loadSettings, saveSettings, getNextPlanningSession, getNextTeamMeeting } = useSettingsStore();
+  const { settings, isLoading, error, loadSettings, saveSettings, getNextPlanningDate, getNextWeeklyMeetingDate } = useSettingsStore();
 
   useEffect(() => {
     if (user) {
@@ -24,7 +24,7 @@ export default function SettingsPage() {
   }, [user, loadSettings]);
 
   const handleSave = async () => {
-    if (!user || !settings) return;
+    if (!user) return;
 
     try {
       await saveSettings(user.uid, settings);
@@ -41,9 +41,9 @@ export default function SettingsPage() {
     }
   };
 
-  if (isLoading || !settings) {
+  if (isLoading) {
     return (
-      <div className="p-6">
+      <div className="container mx-auto py-6">
         <div className="text-center">
           <p>Loading settings...</p>
         </div>
@@ -51,11 +51,11 @@ export default function SettingsPage() {
     );
   }
 
-  const nextPlanningDate = getNextPlanningSession();
-  const nextMeetingDate = getNextTeamMeeting();
+  const nextPlanningDate = getNextPlanningDate();
+  const nextMeetingDate = getNextWeeklyMeetingDate();
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="container mx-auto py-6 space-y-6">
       <div className="border-b pb-4">
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-gray-600 mt-2">Configure your planning preferences</p>
@@ -72,11 +72,7 @@ export default function SettingsPage() {
                 value={settings.weeklyPlanningDay.toString()}
                 onValueChange={(value) => 
                   useSettingsStore.setState(state => ({
-                    ...state,
-                    settings: state.settings ? {
-                      ...state.settings,
-                      weeklyPlanningDay: parseInt(value)
-                    } : null
+                    settings: { ...state.settings, weeklyPlanningDay: parseInt(value) }
                   }))
                 }
               >
@@ -105,11 +101,7 @@ export default function SettingsPage() {
                 value={settings.weeklyPlanningTime}
                 onChange={(e) => 
                   useSettingsStore.setState(state => ({
-                    ...state,
-                    settings: state.settings ? {
-                      ...state.settings,
-                      weeklyPlanningTime: e.target.value
-                    } : null
+                    settings: { ...state.settings, weeklyPlanningTime: e.target.value }
                   }))
                 }
               />
@@ -125,13 +117,9 @@ export default function SettingsPage() {
             </div>
             <Switch
               checked={settings.autoScheduleWeeklyPlanning}
-              onCheckedChange={(checked) =>
+              onCheckedChange={(checked: boolean) =>
                 useSettingsStore.setState(state => ({
-                  ...state,
-                  settings: state.settings ? {
-                    ...state.settings,
-                    autoScheduleWeeklyPlanning: checked
-                  } : null
+                  settings: { ...state.settings, autoScheduleWeeklyPlanning: checked }
                 }))
               }
             />
@@ -146,13 +134,9 @@ export default function SettingsPage() {
             </div>
             <Switch
               checked={settings.reminderEnabled}
-              onCheckedChange={(checked) =>
+              onCheckedChange={(checked: boolean) =>
                 useSettingsStore.setState(state => ({
-                  ...state,
-                  settings: state.settings ? {
-                    ...state.settings,
-                    reminderEnabled: checked
-                  } : null
+                  settings: { ...state.settings, reminderEnabled: checked }
                 }))
               }
             />
@@ -167,12 +151,11 @@ export default function SettingsPage() {
                 max="72"
                 value={settings.reminderHoursBefore}
                 onChange={(e) =>
-                  useSettingsStore.setState(state => ({
-                    ...state,
-                    settings: state.settings ? {
-                      ...state.settings,
+                  useSettingsStore.setState(state => ({ 
+                    settings: { 
+                      ...state.settings, 
                       reminderHoursBefore: parseInt(e.target.value) || 24
-                    } : null
+                    }
                   }))
                 }
               />
@@ -189,14 +172,13 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label>Default Meeting Day</Label>
               <Select
-                value={settings.defaultWeeklyMeetingDay?.toString() || 'none'}
+                value={settings.defaultWeeklyMeetingDay?.toString() || ''}
                 onValueChange={(value) => 
-                  useSettingsStore.setState(state => ({
-                    ...state,
-                    settings: state.settings ? {
-                      ...state.settings,
-                      defaultWeeklyMeetingDay: value === 'none' ? null : parseInt(value)
-                    } : null
+                  useSettingsStore.setState(state => ({ 
+                    settings: { 
+                      ...state.settings, 
+                      defaultWeeklyMeetingDay: value ? parseInt(value) : undefined 
+                    }
                   }))
                 }
               >
@@ -204,7 +186,7 @@ export default function SettingsPage() {
                   <SelectValue placeholder="Select a day" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Not Set</SelectItem>
+                  <SelectItem value="">Not Set</SelectItem>
                   <SelectItem value="0">Sunday</SelectItem>
                   <SelectItem value="1">Monday</SelectItem>
                   <SelectItem value="2">Tuesday</SelectItem>
@@ -227,205 +209,15 @@ export default function SettingsPage() {
                 type="time"
                 value={settings.defaultWeeklyMeetingTime || ''}
                 onChange={(e) => 
-                  useSettingsStore.setState(state => ({
-                    ...state,
-                    settings: state.settings ? {
-                      ...state.settings,
-                      defaultWeeklyMeetingTime: e.target.value || null
-                    } : null
+                  useSettingsStore.setState(state => ({ 
+                    settings: { 
+                      ...state.settings, 
+                      defaultWeeklyMeetingTime: e.target.value || undefined 
+                    }
                   }))
                 }
               />
             </div>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">Appearance</h2>
-        
-        <div className="space-y-6">
-          <div className="space-y-2">
-            <Label>Color Scheme</Label>
-            <Select
-              value={settings.colorScheme}
-              onValueChange={(value) => 
-                useSettingsStore.setState(state => ({
-                  ...state,
-                  settings: state.settings ? {
-                    ...state.settings,
-                    colorScheme: value
-                  } : null
-                }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select color scheme" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="system">System</SelectItem>
-                <SelectItem value="light">Light</SelectItem>
-                <SelectItem value="dark">Dark</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-gray-500">
-              Choose your preferred color scheme
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Default Calendar View</Label>
-            <Select
-              value={settings.defaultView}
-              onValueChange={(value) => 
-                useSettingsStore.setState(state => ({
-                  ...state,
-                  settings: state.settings ? {
-                    ...state.settings,
-                    defaultView: value as 'day' | 'week' | 'month'
-                  } : null
-                }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select default view" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="day">Day</SelectItem>
-                <SelectItem value="week">Week</SelectItem>
-                <SelectItem value="month">Month</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-gray-500">
-              Choose your preferred calendar view
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">Notifications</h2>
-        
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Task Reminders</Label>
-              <p className="text-sm text-gray-500">
-                Get notified about upcoming tasks
-              </p>
-            </div>
-            <Switch
-              checked={settings.notifications.taskReminders}
-              onCheckedChange={(checked) =>
-                useSettingsStore.setState(state => ({
-                  ...state,
-                  settings: state.settings ? {
-                    ...state.settings,
-                    notifications: {
-                      ...state.settings.notifications,
-                      taskReminders: checked
-                    }
-                  } : null
-                }))
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Planning Reminders</Label>
-              <p className="text-sm text-gray-500">
-                Get notified about planning sessions
-              </p>
-            </div>
-            <Switch
-              checked={settings.notifications.planningReminders}
-              onCheckedChange={(checked) =>
-                useSettingsStore.setState(state => ({
-                  ...state,
-                  settings: state.settings ? {
-                    ...state.settings,
-                    notifications: {
-                      ...state.settings.notifications,
-                      planningReminders: checked
-                    }
-                  } : null
-                }))
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Task Assignments</Label>
-              <p className="text-sm text-gray-500">
-                Get notified when tasks are assigned to you
-              </p>
-            </div>
-            <Switch
-              checked={settings.notifications.taskAssignments}
-              onCheckedChange={(checked) =>
-                useSettingsStore.setState(state => ({
-                  ...state,
-                  settings: state.settings ? {
-                    ...state.settings,
-                    notifications: {
-                      ...state.settings.notifications,
-                      taskAssignments: checked
-                    }
-                  } : null
-                }))
-              }
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <Label>Inventory Alerts</Label>
-              <p className="text-sm text-gray-500">
-                Get notified about low inventory items
-              </p>
-            </div>
-            <Switch
-              checked={settings.notifications.inventoryAlerts}
-              onCheckedChange={(checked) =>
-                useSettingsStore.setState(state => ({
-                  ...state,
-                  settings: state.settings ? {
-                    ...state.settings,
-                    notifications: {
-                      ...state.settings.notifications,
-                      inventoryAlerts: checked
-                    }
-                  } : null
-                }))
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Default Reminder Time</Label>
-            <Input
-              type="number"
-              min="1"
-              max="72"
-              value={settings.notifications.reminderHoursBefore}
-              onChange={(e) =>
-                useSettingsStore.setState(state => ({
-                  ...state,
-                  settings: state.settings ? {
-                    ...state.settings,
-                    notifications: {
-                      ...state.settings.notifications,
-                      reminderHoursBefore: parseInt(e.target.value) || 24
-                    }
-                  } : null
-                }))
-              }
-            />
-            <p className="text-sm text-gray-500">
-              Hours before to send reminders (1-72 hours)
-            </p>
           </div>
         </div>
       </Card>

@@ -321,33 +321,3 @@ export type NotificationActionType =
   | 'reschedule'
   | 'accept_invite'
   | 'view_details';
-
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  description?: string;
-  start: Date;
-  end: Date;
-  allDay?: boolean;
-  color?: string;
-  userId: string;
-  householdId: string;
-  recurrence?: RecurrenceRule;
-  parentEventId?: string; // For recurring event instances
-}
-
-export interface RecurrenceRule {
-  frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
-  interval?: number; // e.g., every 2 weeks
-  daysOfWeek?: number[]; // 0-6 for Sunday-Saturday
-  endDate?: Date;
-  count?: number; // Number of occurrences
-  exceptions?: Date[]; // Dates to exclude
-}
-
-export interface EventDragInfo {
-  eventId: string;
-  start: Date;
-  end: Date;
-  allDay: boolean;
-}
