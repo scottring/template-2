@@ -1,13 +1,15 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { RootProvider } from "@/components/providers/RootProvider";
+'use client';
 
-const inter = Inter({ subsets: ["latin"] });
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { RootProvider } from '@/components/providers/RootProvider';
+import { Toaster } from '@/components/ui/toaster';
 
-export const metadata: Metadata = {
-  title: "Symphony - Orchestrate Your Life",
-  description: "Transform your goals into achievable actions with Symphony",
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata = {
+  title: 'Symphony - Orchestrate Your Life',
+  description: 'A powerful tool for collaborative life planning and goal achievement.',
 };
 
 export default function RootLayout({
@@ -16,9 +18,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full">
-      <body className={`${inter.className} h-full`}>
-        <RootProvider>{children}</RootProvider>
+    <html lang="en">
+      <body className={inter.className}>
+        <RootProvider>
+          {children}
+          <Toaster />
+        </RootProvider>
       </body>
     </html>
   );
