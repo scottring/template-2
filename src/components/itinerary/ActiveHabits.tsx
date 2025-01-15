@@ -6,11 +6,13 @@ import { useGoalStore } from '@/lib/stores/useGoalStore';
 import { Goal, ItineraryItem } from '@/types/models';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { ArrowUpRight } from 'lucide-react';
 
 interface HabitWithContext {
   id: string;
   name: string;
   description: string;
+  referenceId: string;
   frequency: {
     type: 'daily' | 'weekly' | 'monthly';
     value: number;
@@ -25,7 +27,6 @@ interface HabitWithContext {
   createdAt: Date;
   updatedAt: Date;
   goal?: Goal;
-  referenceId?: string;
 }
 
 export function ActiveHabits() {
@@ -38,7 +39,6 @@ export function ActiveHabits() {
   useEffect(() => {
     const loadGoalsData = async () => {
       try {
-        console.log('Loading goals...');
         await loadGoals();
         console.log('Goals loaded:', goals.map(g => ({ id: g.id, name: g.name })));
       } catch (error) {
@@ -50,11 +50,12 @@ export function ActiveHabits() {
 
   // Add goal context to each habit
   const habitsWithContext = habits.map(habit => {
-    // For habits, we need to extract the goal ID from the habit ID
-    const goalId = habit.id.split('-')[0];
-    console.log('Looking for goal:', goalId, 'in goals:', goals.map(g => ({ id: g.id, name: g.name })));
-    const goal = goals.find((g: Goal) => g.id === goalId);
-    return { ...habit, goal, referenceId: goalId } as HabitWithContext;
+    console.log('Processing habit:', { id: habit.id, referenceId: habit.referenceId });
+    const goal = goals.find((g: Goal) => g.id === habit.referenceId);
+    if (!goal) {
+      console.log('No goal found for referenceId:', habit.referenceId);
+    }
+    return { ...habit, goal };
   });
 
   const handleHabitClick = (habit: HabitWithContext) => {
@@ -62,7 +63,7 @@ export function ActiveHabits() {
       console.log('Navigating to goal:', habit.goal.id);
       router.push(`/goals/${habit.goal.id}`);
     } else {
-      console.log('No goal found for habit:', { id: habit.id, referenceId: habit.referenceId }, 'Available goals:', goals.map(g => ({ id: g.id, name: g.name })));
+      console.log('No goal found for habit:', { id: habit.id, referenceId: habit.referenceId });
     }
   };
 
@@ -73,21 +74,27 @@ export function ActiveHabits() {
         {habitsWithContext.map((habit) => (
           <div 
             key={habit.id} 
-            className="space-y-2 p-3 rounded-md hover:bg-gray-50 cursor-pointer group"
+            className="relative space-y-2 p-3 rounded-md hover:bg-gray-50 cursor-pointer group"
             onClick={() => handleHabitClick(habit)}
           >
+            {/* Goal Context - Always show at the top */}
+            {habit.goal ? (
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-blue-600 group-hover:text-blue-700">
+                  {habit.goal.name}
+                </p>
+                <ArrowUpRight className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">Unlinked Habit (ID: {habit.referenceId})</p>
+            )}
+
             <div className="flex items-center gap-2">
-              <span className="font-medium group-hover:text-blue-600">{habit.name}</span>
+              <span className="font-medium">{habit.name}</span>
               <span className="text-sm text-orange-500">
                 🔥 {habit.streak} day streak
               </span>
             </div>
-            
-            {habit.goal && (
-              <p className="text-sm text-gray-500 group-hover:text-blue-500">
-                Part of: {habit.goal.name}
-              </p>
-            )}
 
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <span>

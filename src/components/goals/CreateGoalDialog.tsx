@@ -46,6 +46,7 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
     if (!formData.name) return;
 
     try {
+      console.log('Creating goal with data:', formData);
       const goalData: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'> = {
         name: formData.name,
         description: formData.description,
@@ -62,8 +63,19 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
         assignedTo: formData.assignedTo
       };
 
-      await addGoal(goalData);
-      generateFromGoal({ ...goalData, id: crypto.randomUUID(), createdAt: new Date(), updatedAt: new Date() });
+      // Add the goal and get its Firebase ID
+      const goalId = await addGoal(goalData);
+      console.log('Goal created with ID:', goalId);
+      
+      // Generate habits using the actual goal ID
+      const newGoal: Goal = { 
+        ...goalData, 
+        id: goalId, 
+        createdAt: new Date(), 
+        updatedAt: new Date() 
+      };
+      console.log('Generating habits for goal:', { id: newGoal.id, name: newGoal.name });
+      generateFromGoal(newGoal);
 
       onClose();
       setFormData({

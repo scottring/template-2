@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useItineraryStore } from '@/lib/stores/useItineraryStore';
-import type { Itinerary, ItineraryItem, TimeScale, ItineraryType } from '@/types/models';
+import { useRouter } from 'next/navigation';
+import useItineraryStore from '@/lib/stores/useItineraryStore';
+import { useGoalStore } from '@/lib/stores/useGoalStore';
+import type { ItineraryItem, TimeScale, ItineraryType } from '@/types/models';
 import { format } from 'date-fns';
 
 interface ItineraryViewProps {
@@ -12,25 +14,40 @@ interface ItineraryViewProps {
 }
 
 export function ItineraryView({ date, type, timeScale }: ItineraryViewProps) {
-  const { getItineraryByDate, updateItemStatus } = useItineraryStore();
-  const [itinerary, setItinerary] = useState<Itinerary | null>(null);
+  const router = useRouter();
+  const { getTodayItems, updateItem } = useItineraryStore();
+  const { goals } = useGoalStore();
+  const [items, setItems] = useState<ItineraryItem[]>([]);
+  const [goalMap, setGoalMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const currentItinerary = getItineraryByDate(date, type, timeScale);
-    setItinerary(currentItinerary);
-  }, [date, type, timeScale, getItineraryByDate]);
+    const currentItems = getTodayItems(date);
+    setItems(currentItems);
+    
+    // Create mapping of goal IDs to goal names
+    const newGoalMap: Record<string, string> = {};
+    goals.forEach(goal => {
+      newGoalMap[goal.id] = goal.name;
+    });
+    setGoalMap(newGoalMap);
+  }, [date, getTodayItems, goals]);
 
-  if (!itinerary) {
+  if (!items.length) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-500">No itinerary found for this date.</p>
+        <p className="text-gray-500">No items found for this date.</p>
       </div>
     );
   }
 
-  const handleStatusChange = async (itemId: string, status: ItineraryItem['status']) => {
-    if (!itinerary) return;
-    await updateItemStatus(itinerary.id, itemId, status);
+  const handleStatusChange = (itemId: string, status: ItineraryItem['status']) => {
+    updateItem(itemId, { status });
+  };
+
+  const handleItemClick = (item: ItineraryItem) => {
+    if (item.parentId) {
+      router.push(`/itinerary/${item.parentId}`);
+    }
   };
 
   return (
@@ -43,17 +60,27 @@ export function ItineraryView({ date, type, timeScale }: ItineraryViewProps) {
       </div>
 
       <div className="divide-y divide-gray-200">
-        {itinerary.items.map((item) => (
-          <div key={item.id} className="py-4">
+        {items.map((item: ItineraryItem) => (
+          <div 
+            key={item.id} 
+            className="py-4 cursor-pointer hover:bg-gray-50"
+            onClick={() => handleItemClick(item)}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <span className="text-gray-900">{item.type}</span>
+                {item.goalId && goalMap[item.goalId] && (
+                  <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                    {goalMap[item.goalId]}
+                  </span>
+                )}
                 <span className="text-gray-500">{item.notes}</span>
               </div>
               <select
                 value={item.status}
                 onChange={(e) => handleStatusChange(item.id, e.target.value as ItineraryItem['status'])}
                 className="rounded-md border-gray-300 text-sm"
+                onClick={(e) => e.stopPropagation()}
               >
                 <option value="pending">Pending</option>
                 <option value="completed">Completed</option>
@@ -66,4 +93,4 @@ export function ItineraryView({ date, type, timeScale }: ItineraryViewProps) {
       </div>
     </div>
   );
-} 
+}

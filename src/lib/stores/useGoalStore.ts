@@ -7,7 +7,7 @@ interface GoalStore {
   goals: Goal[];
   setGoals: (goals: Goal[]) => void;
   loadGoals: () => Promise<void>;
-  addGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  addGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   updateGoal: (goalId: string, updates: Partial<Goal>) => Promise<void>;
   deleteGoal: (goalId: string) => Promise<void>;
 }
@@ -17,8 +17,10 @@ export const useGoalStore = create<GoalStore>((set) => ({
   setGoals: (goals) => set({ goals }),
   loadGoals: async () => {
     try {
+      console.log('Starting to load goals...');
       const querySnapshot = await getDocs(collection(db, 'goals'));
       const goals = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Goal));
+      console.log('Loaded goals:', goals.map(g => ({ id: g.id, name: g.name })));
       set({ goals });
     } catch (error) {
       console.error('Error loading goals:', error);
@@ -47,6 +49,7 @@ export const useGoalStore = create<GoalStore>((set) => ({
       const goal = { ...newGoal, id: docRef.id } as Goal;
       
       set((state) => ({ goals: [...state.goals, goal] }));
+      return docRef.id; // Return the new goal's ID
     } catch (error) {
       console.error('Error adding goal:', error);
       throw error;
