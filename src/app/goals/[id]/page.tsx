@@ -5,12 +5,11 @@ import { query, collection, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { Goal, Project } from '@/types/models';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, PlusIcon, MoreVertical, Calendar, Target, CheckCircle, Share2, Trash2 } from 'lucide-react';
+import { ArrowLeft, PlusIcon, MoreVertical, Calendar, Target, Share2, Trash2 } from 'lucide-react';
 import { useGoalStore } from '@/lib/stores/useGoalStore';
 import { useProjectStore } from '@/lib/stores/useProjectStore';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
-import { EditGoalDialog } from '@/components/goals/EditGoalDialog';
 import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
 import { TasksSection } from '@/components/goals/TasksSection';
 import { Notepad } from '@/components/shared/Notepad';
@@ -20,14 +19,13 @@ import { QuerySnapshot, DocumentData } from 'firebase/firestore';
 
 export default function GoalDetailPage({ params }: { params: { id: string } }) {
   const [loading, setLoading] = useState(true);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateProjectDialogOpen, setIsCreateProjectDialogOpen] = useState(false);
   const [sharingGoal, setSharingGoal] = useState<Goal | null>(null);
   const router = useRouter();
   const { goals, deleteGoal, subscribeToGoals } = useGoalStore();
   const { projects, setProjects } = useProjectStore();
   const goal = goals.find(g => g.id === params.id);
-  const goalProjects: Project[] = projects.filter((project: Project) => project.goalId === params.id);
+  const goalProjects: Project[] = projects.filter((project) => project.goalId === params.id);
 
   useEffect(() => {
     const unsubscribe = subscribeToGoals();
@@ -125,19 +123,6 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
                 <Menu.Item>
                   {({ active }) => (
                     <button
-                      onClick={() => setIsEditDialogOpen(true)}
-                      className={`${
-                        active ? 'bg-gray-100' : ''
-                      } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
-                    >
-                      <CheckCircle className="mr-3 h-5 w-5 text-gray-400" aria-hidden="true" />
-                      Edit Goal
-                    </button>
-                  )}
-                </Menu.Item>
-                <Menu.Item>
-                  {({ active }) => (
-                    <button
                       onClick={() => setSharingGoal(goal)}
                       className={`${
                         active ? 'bg-gray-100' : ''
@@ -227,12 +212,6 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
           <Notepad initialContent="" />
         </div>
       </div>
-
-      <EditGoalDialog
-        goal={goal}
-        open={isEditDialogOpen}
-        onClose={() => setIsEditDialogOpen(false)}
-      />
 
       <CreateProjectDialog
         goalId={goal.id}

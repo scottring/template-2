@@ -102,7 +102,18 @@ export const useGoalStore = create<GoalStore>((set) => ({
   updateGoal: async (goalId, updates) => {
     try {
       const goalRef = doc(db, 'goals', goalId);
-      const updatedGoal = { ...updates, updatedAt: new Date() };
+      
+      // Clean up the updates by removing undefined values
+      const cleanedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as Record<string, any>);
+
+      // Add updatedAt
+      const updatedGoal = { ...cleanedUpdates, updatedAt: new Date() };
+      
       await updateDoc(goalRef, updatedGoal);
     } catch (error) {
       console.error('Error updating goal:', error);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,12 +10,24 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useSettingsStore } from '@/lib/stores/useSettingsStore';
-import { format } from 'date-fns';
+import { useHouseholdStore } from '@/lib/stores/useHouseholdStore';
+import { Copy, UserPlus, UserX } from 'lucide-react';
 
 export default function SettingsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { settings, isLoading, error, loadSettings, saveSettings, getNextPlanningDate, getNextWeeklyMeetingDate } = useSettingsStore();
+  const { settings, isLoading: settingsLoading, loadSettings, updateSettings } = useSettingsStore();
+  const { 
+    household,
+    members,
+    inviteCodes,
+    isLoading: householdLoading,
+    createInviteCode,
+    invalidateInviteCode,
+    removeMember,
+    updateMember
+  } = useHouseholdStore();
+  const [newInviteCode, setNewInviteCode] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -24,10 +36,10 @@ export default function SettingsPage() {
   }, [user, loadSettings]);
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !settings) return;
 
     try {
-      await saveSettings(user.uid, settings);
+      await updateSettings(settings);
       toast({
         title: 'Success',
         description: 'Settings saved successfully',
@@ -41,122 +53,206 @@ export default function SettingsPage() {
     }
   };
 
-  if (isLoading) {
+  const handleCreateInvite = async () => {
+    try {
+      const code = await createInviteCode();
+      setNewInviteCode(code);
+      toast({
+        title: 'Success',
+        description: 'New invite code created',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to create invite code',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleCopyInvite = (code: string) => {
+    navigator.clipboard.writeText(code);
+    toast({
+      title: 'Success',
+      description: 'Invite code copied to clipboard',
+    });
+  };
+
+  const handleInvalidateInvite = async (code: string) => {
+    try {
+      await invalidateInviteCode(code);
+      toast({
+        title: 'Success',
+        description: 'Invite code invalidated',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to invalidate invite code',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRemoveMember = async (userId: string) => {
+    if (!confirm('Are you sure you want to remove this member?')) return;
+
+    try {
+      await removeMember(userId);
+      toast({
+        title: 'Success',
+        description: 'Member removed from household',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to remove member',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  if (settingsLoading || householdLoading) {
     return (
       <div className="container mx-auto py-6">
         <div className="text-center">
-          <p>Loading settings...</p>
+          <p>Loading...</p>
         </div>
       </div>
     );
   }
 
-  const nextPlanningDate = getNextPlanningDate();
-  const nextMeetingDate = getNextWeeklyMeetingDate();
+  if (!settings || !household) return null;
 
   return (
     <div className="container mx-auto py-6 space-y-6">
       <div className="border-b pb-4">
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-gray-600 mt-2">Configure your planning preferences</p>
+        <p className="text-gray-600 mt-2">Configure your preferences and manage your household</p>
       </div>
 
       <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">Weekly Planning</h2>
+        <h2 className="text-lg font-semibold mb-4">Household Members</h2>
+        <div className="space-y-4">
+          {members.map((member) => (
+            <div key={member.userId} className="flex items-center justify-between py-2">
+              <div className="flex items-center space-x-3">
+                {member.photoURL && (
+                  <img
+                    src={member.photoURL}
+                    alt={member.displayName}
+                    className="w-8 h-8 rounded-full"
+                  />
+                )}
+                <div>
+                  <p className="font-medium">{member.displayName}</p>
+                  <p className="text-sm text-gray-500">{member.role}</p>
+                </div>
+              </div>
+              {user?.uid !== member.userId && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleRemoveMember(member.userId)}
+                >
+                  <UserX className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-6 space-y-4">
+          <h3 className="text-md font-medium">Invite New Members</h3>
+          <div className="flex items-center space-x-2">
+            <Button onClick={handleCreateInvite}>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Generate Invite Code
+            </Button>
+          </div>
+
+          {inviteCodes.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Active Invite Codes:</p>
+              {inviteCodes.map((invite) => (
+                <div key={invite.code} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                  <code className="text-sm">{invite.code}</code>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopyInvite(invite.code)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleInvalidateInvite(invite.code)}
+                    >
+                      <UserX className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Notifications</h2>
         
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Planning Day</Label>
-              <Select
-                value={settings.weeklyPlanningDay.toString()}
-                onValueChange={(value) => 
-                  useSettingsStore.setState(state => ({
-                    settings: { ...state.settings, weeklyPlanningDay: parseInt(value) }
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a day" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">Sunday</SelectItem>
-                  <SelectItem value="1">Monday</SelectItem>
-                  <SelectItem value="2">Tuesday</SelectItem>
-                  <SelectItem value="3">Wednesday</SelectItem>
-                  <SelectItem value="4">Thursday</SelectItem>
-                  <SelectItem value="5">Friday</SelectItem>
-                  <SelectItem value="6">Saturday</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-gray-500">
-                Next planning session: {format(nextPlanningDate, 'PPPp')}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Planning Time</Label>
-              <Input
-                type="time"
-                value={settings.weeklyPlanningTime}
-                onChange={(e) => 
-                  useSettingsStore.setState(state => ({
-                    settings: { ...state.settings, weeklyPlanningTime: e.target.value }
-                  }))
-                }
-              />
-            </div>
-          </div>
-
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label>Auto-schedule Weekly Planning</Label>
+              <Label>Task Reminders</Label>
               <p className="text-sm text-gray-500">
-                Automatically add weekly planning sessions to your schedule
+                Get notified about upcoming and overdue tasks
               </p>
             </div>
             <Switch
-              checked={settings.autoScheduleWeeklyPlanning}
-              onCheckedChange={(checked: boolean) =>
-                useSettingsStore.setState(state => ({
-                  settings: { ...state.settings, autoScheduleWeeklyPlanning: checked }
-                }))
+              checked={settings.notifications.taskReminders}
+              onCheckedChange={(checked) =>
+                updateSettings({
+                  notifications: { ...settings.notifications, taskReminders: checked }
+                })
               }
             />
           </div>
 
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <Label>Planning Reminders</Label>
+              <Label>Task Assignments</Label>
               <p className="text-sm text-gray-500">
-                Get notified before your weekly planning session
+                Get notified when tasks are assigned to you
               </p>
             </div>
             <Switch
-              checked={settings.reminderEnabled}
-              onCheckedChange={(checked: boolean) =>
-                useSettingsStore.setState(state => ({
-                  settings: { ...state.settings, reminderEnabled: checked }
-                }))
+              checked={settings.notifications.taskAssignments}
+              onCheckedChange={(checked) =>
+                updateSettings({
+                  notifications: { ...settings.notifications, taskAssignments: checked }
+                })
               }
             />
           </div>
 
-          {settings.reminderEnabled && (
+          {(settings.notifications.taskReminders || settings.notifications.taskAssignments) && (
             <div className="space-y-2">
               <Label>Reminder Hours Before</Label>
               <Input
                 type="number"
                 min="1"
                 max="72"
-                value={settings.reminderHoursBefore}
+                value={settings.notifications.reminderHoursBefore}
                 onChange={(e) =>
-                  useSettingsStore.setState(state => ({ 
-                    settings: { 
-                      ...state.settings, 
+                  updateSettings({
+                    notifications: {
+                      ...settings.notifications,
                       reminderHoursBefore: parseInt(e.target.value) || 24
                     }
-                  }))
+                  })
                 }
               />
             </div>
@@ -165,59 +261,45 @@ export default function SettingsPage() {
       </Card>
 
       <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">Weekly Team Meeting</h2>
+        <h2 className="text-lg font-semibold mb-4">Display</h2>
         
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Default Meeting Day</Label>
-              <Select
-                value={settings.defaultWeeklyMeetingDay?.toString() || ''}
-                onValueChange={(value) => 
-                  useSettingsStore.setState(state => ({ 
-                    settings: { 
-                      ...state.settings, 
-                      defaultWeeklyMeetingDay: value ? parseInt(value) : undefined 
-                    }
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a day" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Not Set</SelectItem>
-                  <SelectItem value="0">Sunday</SelectItem>
-                  <SelectItem value="1">Monday</SelectItem>
-                  <SelectItem value="2">Tuesday</SelectItem>
-                  <SelectItem value="3">Wednesday</SelectItem>
-                  <SelectItem value="4">Thursday</SelectItem>
-                  <SelectItem value="5">Friday</SelectItem>
-                  <SelectItem value="6">Saturday</SelectItem>
-                </SelectContent>
-              </Select>
-              {nextMeetingDate && (
-                <p className="text-sm text-gray-500">
-                  Next meeting: {format(nextMeetingDate, 'PPPp')}
-                </p>
-              )}
-            </div>
+          <div className="space-y-2">
+            <Label>Default View</Label>
+            <Select
+              value={settings.defaultView}
+              onValueChange={(value: 'day' | 'week' | 'month') =>
+                updateSettings({ defaultView: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select view" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="day">Day</SelectItem>
+                <SelectItem value="week">Week</SelectItem>
+                <SelectItem value="month">Month</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="space-y-2">
-              <Label>Default Meeting Time</Label>
-              <Input
-                type="time"
-                value={settings.defaultWeeklyMeetingTime || ''}
-                onChange={(e) => 
-                  useSettingsStore.setState(state => ({ 
-                    settings: { 
-                      ...state.settings, 
-                      defaultWeeklyMeetingTime: e.target.value || undefined 
-                    }
-                  }))
-                }
-              />
-            </div>
+          <div className="space-y-2">
+            <Label>Color Scheme</Label>
+            <Select
+              value={settings.colorScheme}
+              onValueChange={(value: 'system' | 'light' | 'dark') =>
+                updateSettings({ colorScheme: value })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select color scheme" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="system">System</SelectItem>
+                <SelectItem value="light">Light</SelectItem>
+                <SelectItem value="dark">Dark</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </Card>
