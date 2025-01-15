@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Sidebar, SidebarBody, SidebarLink } from '@/components/ui/sidebar';
-import { Home, MapPin, ListChecks, Calendar, Users, ListTodo, Map } from 'lucide-react';
+import { Home, MapPin, ListChecks, Calendar, Users, ListTodo, Map, ClipboardList } from 'lucide-react';
 
 interface DashboardProps {
   children: React.ReactNode;
@@ -14,6 +14,7 @@ const Dashboard: React.FC<DashboardProps> = ({ children }) => {
         { label: 'Areas', href: '/areas', icon: <MapPin className="w-5 h-5" /> },
         { label: 'Goals', href: '/goals', icon: <ListChecks className="w-5 h-5" /> },
         { label: 'Tasks', href: '/tasks', icon: <ListTodo className="w-5 h-5" /> },
+        { label: 'Planning', href: '/planning', icon: <ClipboardList className="w-5 h-5" /> },
         { label: 'Calendar', href: '/calendar', icon: <Calendar className="w-5 h-5" /> },
         { label: 'Family', href: '/family', icon: <Users className="w-5 h-5" /> },
         { label: 'Itinerary', href: '/itinerary', icon: <Map className="w-5 h-5" /> },

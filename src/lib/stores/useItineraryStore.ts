@@ -58,7 +58,7 @@ interface ItineraryState {
   updateItem: (id: string, updates: Partial<ItineraryItem>) => void;
   removeItem: (id: string) => void;
   completeItem: (id: string, completed: boolean) => void;
-  clearAllItems: () => void;
+  clearAllItems: (shouldRegenerate?: boolean) => void;
   
   // Goal Integration
   generateFromGoal: (goal: Goal) => void;
@@ -77,6 +77,10 @@ interface ItineraryState {
   // Progress Management
   getProgress: (itemId: string) => ItemProgress | null;
   syncProgress: (goalId: string) => void;
+
+  regenerateAllItems: () => Promise<void>;
+
+  updateItemSchedule: (itemId: string, schedule: ItineraryItem['schedule']) => void;
 }
 
 const useItineraryStore = create<ItineraryState>()(
@@ -147,7 +151,24 @@ const useItineraryStore = create<ItineraryState>()(
         const trackedCriteria = goal.successCriteria.filter(c => c.isTracked && c.timescale);
         console.log('Tracked criteria:', trackedCriteria);
 
-        // First, remove any existing habits for this goal
+        // First, preserve any existing progress and streak data for this goal's habits
+        const state = get();
+        const existingItems = state.items.filter(item => 
+          item.referenceId === goal.id && item.type === 'habit'
+        );
+        const existingProgress: Record<string, ItemProgress> = {};
+        const existingStreaks: Record<string, StreakData> = {};
+
+        existingItems.forEach(item => {
+          if (state.progress[item.id]) {
+            existingProgress[item.id] = state.progress[item.id];
+          }
+          if (state.streaks[item.id]) {
+            existingStreaks[item.id] = state.streaks[item.id];
+          }
+        });
+
+        // Remove existing habits for this goal
         set((state) => ({
           items: state.items.filter((item) => 
             !(item.referenceId === goal.id && item.type === 'habit')
@@ -164,6 +185,9 @@ const useItineraryStore = create<ItineraryState>()(
             const [_, count, period] = frequencyMatch;
             targetTotal = parseInt(count);
             console.log(`Extracted frequency: ${targetTotal} times per ${period}`);
+          } else {
+            // If no explicit frequency, use default based on timescale
+            targetTotal = getDefaultTotal(criteria.timescale!);
           }
 
           // Create a unique ID that includes both goal ID and criteria text
@@ -175,7 +199,8 @@ const useItineraryStore = create<ItineraryState>()(
             referenceId: goal.id,
             status: 'pending',
             notes: criteria.text,
-            timescale: criteria.timescale
+            timescale: criteria.timescale,
+            dueDate: criteria.nextOccurrence
           };
 
           console.log('Creating habit:', { 
@@ -183,19 +208,27 @@ const useItineraryStore = create<ItineraryState>()(
             referenceId: item.referenceId,
             notes: item.notes,
             timescale: item.timescale,
-            targetTotal
+            targetTotal,
+            dueDate: item.dueDate
           });
 
           get().addItem(item);
           
-          // Initialize progress tracking with the correct target total
+          // Restore existing progress and streak data or initialize new ones
           set((state) => ({
             progress: {
               ...state.progress,
-              [item.id]: {
+              [item.id]: existingProgress[item.id] || {
                 completed: 0,
                 total: targetTotal,
                 lastUpdatedAt: new Date()
+              }
+            },
+            streaks: {
+              ...state.streaks,
+              [item.id]: existingStreaks[item.id] || {
+                count: 0,
+                lastCompletedAt: null
               }
             }
           }));
@@ -239,40 +272,85 @@ const useItineraryStore = create<ItineraryState>()(
       // Queries
       getTodayItems: (date = new Date()) => {
         const state = get();
-        return state.items.filter((item) => {
-          // For habits, check if they need to be done today based on timescale
-          if (item.type === 'habit') {
-            const progress = state.progress[item.id];
-            if (!progress) return false;
-            
-            // Check if the item needs to be done today based on its timescale
-            const lastUpdate = new Date(progress.lastUpdatedAt);
-            const today = startOfDay(date);
-            const daysSinceLastUpdate = Math.floor(
-              (today.getTime() - startOfDay(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)
-            );
+        const dayStart = startOfDay(date);
+        const dayEnd = endOfDay(date);
+        const dayOfWeek = date.getDay();
 
-            // If it's been completed today, don't show it
-            if (isSameDay(lastUpdate, today) && progress.completed >= progress.total) {
+        return state.items.filter(item => {
+          // For habits with specific schedules
+          if (item.type === 'habit' && item.schedule) {
+            // Check if this day is in the schedule
+            if (!item.schedule.days.includes(dayOfWeek)) {
               return false;
             }
 
-            // Check based on timescale
+            const progress = state.progress[item.id];
+            if (!progress) return false;
+
+            // If already completed today, don't show
+            if (progress.lastUpdatedAt && isSameDay(progress.lastUpdatedAt, date)) {
+              const isCompleted = state.items.find(i => i.id === item.id)?.status === 'completed';
+              if (isCompleted) return false;
+            }
+
+            return true;
+          }
+          
+          // For habits without specific schedules (legacy support)
+          if (item.type === 'habit' && !item.schedule) {
+            const progress = state.progress[item.id];
+            if (!progress) return false;
+
+            // If already completed today, don't show
+            if (progress.lastUpdatedAt && isSameDay(progress.lastUpdatedAt, date)) {
+              const isCompleted = state.items.find(i => i.id === item.id)?.status === 'completed';
+              if (isCompleted) return false;
+            }
+
+            // Check if this habit should be shown on this date based on timescale
             switch (item.timescale) {
               case 'daily':
-                return daysSinceLastUpdate >= 1 || progress.completed < progress.total;
+                return true;
               case 'weekly':
-                return daysSinceLastUpdate >= 7 || progress.completed < progress.total;
+                // Show on the same day of week as when it was created
+                const createdDay = new Date(item.id.split('-')[0]).getDay();
+                return date.getDay() === createdDay;
               case 'monthly':
-                return daysSinceLastUpdate >= 30 || progress.completed < progress.total;
+                // Show on the same date of month as when it was created
+                const createdDate = new Date(item.id.split('-')[0]).getDate();
+                return date.getDate() === createdDate;
+              case 'quarterly':
+                // Show on the first day of each quarter
+                const month = date.getMonth();
+                return date.getDate() === 1 && (month % 3 === 0);
+              case 'yearly':
+                // Show on January 1st
+                return date.getMonth() === 0 && date.getDate() === 1;
               default:
                 return false;
             }
           }
 
-          // For tasks, check the due date
-          return item.type === 'task' && item.dueDate && isSameDay(date, item.dueDate);
+          // For tasks and events, check if they're due on this date
+          if (item.dueDate) {
+            return isWithinInterval(item.dueDate, { start: dayStart, end: dayEnd });
+          }
+
+          return false;
+        }).sort((a, b) => {
+          // Sort by scheduled time if available
+          const timeA = a.schedule?.time || '23:59';
+          const timeB = b.schedule?.time || '23:59';
+          return timeA.localeCompare(timeB);
         });
+      },
+
+      updateItemSchedule: (itemId: string, schedule: ItineraryItem['schedule']) => {
+        set((state) => ({
+          items: state.items.map((item) =>
+            item.id === itemId ? { ...item, schedule } : item
+          ),
+        }));
       },
 
       getActiveHabits: () => {
@@ -395,12 +473,43 @@ const useItineraryStore = create<ItineraryState>()(
         });
       },
 
-      clearAllItems: () => {
+      clearAllItems: (shouldRegenerate = false) => {
         set((state) => ({
           items: [],
           streaks: {},
           progress: {}
         }));
+
+        if (shouldRegenerate) {
+          // Import dynamically to avoid circular dependency
+          import('./useGoalStore').then(({ useGoalStore }) => {
+            const goals = useGoalStore.getState().goals;
+            console.log('Regenerating items from goals:', goals.map(g => g.name));
+            goals.forEach(goal => {
+              get().generateFromGoal(goal);
+            });
+          });
+        }
+      },
+
+      regenerateAllItems: async () => {
+        // First clear everything
+        set((state) => ({
+          items: [],
+          streaks: {},
+          progress: {}
+        }));
+
+        // Import dynamically to avoid circular dependency
+        const { useGoalStore } = await import('./useGoalStore');
+        const goals = useGoalStore.getState().goals;
+        
+        console.log('Regenerating all items from goals:', goals.map(g => g.name));
+        
+        // Generate items for each goal
+        goals.forEach(goal => {
+          get().generateFromGoal(goal);
+        });
       }
     }),
     {
