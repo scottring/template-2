@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { format, addDays } from 'date-fns';
 import { Card } from '@/components/ui/card';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
-import { ItineraryItem } from '@/types/models';
+import { ItineraryItem, TimeScale } from '@/types/models';
 
 interface WeeklyScheduleProps {
   startDate: Date;
@@ -17,47 +17,49 @@ interface DaySchedule {
 
 interface NewSchedule {
   schedules: DaySchedule[];
-  repeat: string;
+  repeat: TimeScale;
 }
 
 interface OldSchedule {
   days: number[];
   time: string;
-  repeat: string;
+  repeat: TimeScale;
 }
 
-// Generate time slots from 5am to 10pm
-const timeSlots = Array.from({ length: (22 - 5 + 1) * 2 }).map((_, i) => {
-  const hour = Math.floor(i / 2) + 5; // Start from 5am
-  const minute = i % 2 === 0 ? '00' : '30';
-  return `${hour.toString().padStart(2, '0')}:${minute}`;
+const TIME_SLOTS = Array.from({ length: 18 }, (_, i) => {
+  const hour = (i + 5).toString().padStart(2, '0');
+  return `${hour}:00`;
 });
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function WeeklySchedule({ startDate }: WeeklyScheduleProps) {
   const { items } = useItineraryStore();
 
   const weekDays = useMemo(() => {
-    return Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
+    return Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
   }, [startDate]);
 
-  const getItemsForDayAndTime = (day: Date, time: string) => {
+  const getItemsForDayAndTime = (date: Date, time: string) => {
     return items.filter(item => {
       if (!item.schedule) return false;
-      
-      // Check if it's using the new format
+
+      // Check if it's using the new schedule format
       if ('schedules' in item.schedule) {
         const schedule = item.schedule as NewSchedule;
         return schedule.schedules.some(
           (daySchedule: DaySchedule) => 
-            daySchedule.day === day.getDay() && 
+            daySchedule.day === date.getDay() && 
             daySchedule.time === time
         );
       }
-      
-      // Must be using the old format
+
+      // Must be using the old schedule format
       const schedule = item.schedule as OldSchedule;
-      return schedule.days.includes(day.getDay()) && 
-             schedule.time === time;
+      return (
+        schedule.days.includes(date.getDay()) &&
+        schedule.time === time
+      );
     });
   };
 
@@ -65,29 +67,28 @@ export function WeeklySchedule({ startDate }: WeeklyScheduleProps) {
     <div className="overflow-x-auto">
       <div className="min-w-[800px]">
         {/* Header */}
-        <div className="grid grid-cols-[100px_repeat(7,1fr)] gap-2 mb-4">
-          <div className="text-sm font-medium text-muted-foreground">Time</div>
-          {weekDays.map(day => (
-            <div key={day.toISOString()} className="text-sm font-medium">
-              {format(day, 'EEE MM/dd')}
+        <div className="grid grid-cols-8 gap-2 mb-4">
+          <div className="font-medium text-sm text-gray-500">Time</div>
+          {weekDays.map((date) => (
+            <div key={date.toISOString()} className="text-center">
+              <div className="font-medium">{WEEKDAYS[date.getDay()]}</div>
+              <div className="text-sm text-gray-500">{format(date, 'd')}</div>
             </div>
           ))}
         </div>
 
         {/* Time slots */}
         <div className="space-y-2">
-          {timeSlots.map(time => (
-            <div key={time} className="grid grid-cols-[100px_repeat(7,1fr)] gap-2">
-              <div className="text-sm text-muted-foreground">
-                {format(new Date(`2000-01-01T${time}`), 'h:mm a')}
-              </div>
-              {weekDays.map(day => {
-                const dayItems = getItemsForDayAndTime(day, time);
+          {TIME_SLOTS.map((time) => (
+            <div key={time} className="grid grid-cols-8 gap-2">
+              <div className="text-sm text-gray-500 pt-2">{time}</div>
+              {weekDays.map((date) => {
+                const items = getItemsForDayAndTime(date, time);
                 return (
-                  <div key={day.toISOString()} className="min-h-[40px]">
-                    {dayItems.map(item => (
-                      <Card key={item.id} className="p-2 text-sm bg-primary/10">
-                        {item.notes}
+                  <div key={date.toISOString()} className="min-h-[60px]">
+                    {items.map((item) => (
+                      <Card key={item.id} className="p-2 mb-2 bg-blue-50 border-blue-200">
+                        <p className="text-sm font-medium truncate">{item.notes}</p>
                       </Card>
                     ))}
                   </div>

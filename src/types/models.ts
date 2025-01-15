@@ -89,22 +89,28 @@ export interface User {
   updatedAt: Date;
 }
 
-export type TimeScale = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type TimeScale = 'daily' | 'weekly' | 'monthly' | 'quarterly';
 export type ItineraryType = 'planning' | 'review';
+
+export interface DaySchedule {
+  day: number;
+  time: string;
+}
+
+export interface Schedule {
+  schedules: DaySchedule[];
+  repeat: TimeScale;
+}
 
 export interface ItineraryItem {
   id: string;
-  type: 'habit' | 'task' | 'event';
-  referenceId: string;
-  status: 'pending' | 'completed';
   notes: string;
-  dueDate?: Date;
-  timescale?: TimeScale;
-  schedule?: {
-    days: number[];  // Array of days (0-6 for Sunday-Saturday)
-    time: string;    // HH:mm format
-    repeat: TimeScale;
-  };
+  type: 'habit' | 'task' | 'event';
+  status: 'pending' | 'completed';
+  schedule?: Schedule;
+  referenceId?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Itinerary {
