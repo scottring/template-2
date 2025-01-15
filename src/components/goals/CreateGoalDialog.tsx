@@ -53,7 +53,12 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
         startDate: formData.startDate,
         targetDate: formData.targetDate,
         progress: 0,
-        successCriteria: formData.successCriteria,
+        successCriteria: formData.successCriteria.map(criteria => ({
+          text: criteria.text || '',
+          isTracked: criteria.isTracked || false,
+          timescale: criteria.timescale || undefined,
+          nextOccurrence: criteria.nextOccurrence || undefined
+        })),
         assignedTo: formData.assignedTo
       };
 

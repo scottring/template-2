@@ -185,16 +185,34 @@ const useItineraryStore = create<ItineraryState>()(
       getTodayItems: (date = new Date()) => {
         const state = get();
         return state.items.filter((item) => {
-          // For habits, check if they need to be done today
+          // For habits, check if they need to be done today based on timescale
           if (item.type === 'habit') {
             const progress = state.progress[item.id];
             if (!progress) return false;
             
-            return progress.completed < progress.total &&
-              isWithinInterval(date, {
-                start: startOfDay(progress.lastUpdatedAt),
-                end: endOfDay(progress.lastUpdatedAt)
-              });
+            // Check if the item needs to be done today based on its timescale
+            const lastUpdate = new Date(progress.lastUpdatedAt);
+            const today = startOfDay(date);
+            const daysSinceLastUpdate = Math.floor(
+              (today.getTime() - startOfDay(lastUpdate).getTime()) / (1000 * 60 * 60 * 24)
+            );
+
+            // If it's been completed today, don't show it
+            if (isSameDay(lastUpdate, today) && progress.completed >= progress.total) {
+              return false;
+            }
+
+            // Check based on timescale
+            switch (item.timescale) {
+              case 'daily':
+                return daysSinceLastUpdate >= 1 || progress.completed < progress.total;
+              case 'weekly':
+                return daysSinceLastUpdate >= 7 || progress.completed < progress.total;
+              case 'monthly':
+                return daysSinceLastUpdate >= 30 || progress.completed < progress.total;
+              default:
+                return false;
+            }
           }
 
           // For tasks, check the due date

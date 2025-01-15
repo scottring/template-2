@@ -46,14 +46,17 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
   useEffect(() => {
     if (!goal) return;
     
-    const startDate = goal.startDate ? new Date(goal.startDate) : null;
-    const targetDate = goal.targetDate ? new Date(goal.targetDate) : null;
+    const startDate = goal.startDate ? new Date(goal.startDate) : new Date();
+    const targetDate = goal.targetDate ? new Date(goal.targetDate) : new Date();
+    
+    const validStartDate = !isNaN(startDate.getTime()) ? startDate : new Date();
+    const validTargetDate = !isNaN(targetDate.getTime()) ? targetDate : new Date();
     
     setFormData({
       name: goal.name || '',
       description: goal.description || '',
-      startDate,
-      targetDate,
+      startDate: validStartDate,
+      targetDate: validTargetDate,
       successCriteria: Array.isArray(goal.successCriteria) 
         ? goal.successCriteria.map(criteria => {
             if (typeof criteria === 'string') {
@@ -77,6 +80,11 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
     e.preventDefault();
     if (!formData.startDate || !formData.targetDate) return;
     
+    if (isNaN(formData.startDate.getTime()) || isNaN(formData.targetDate.getTime())) {
+      console.error('Invalid date values');
+      return;
+    }
+    
     setIsSubmitting(true);
 
     try {
@@ -88,7 +96,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
           text: c.text,
           isTracked: c.isTracked,
           timescale: c.timescale,
-          nextOccurrence: c.isTracked && formData.startDate
+          nextOccurrence: c.isTracked && formData.startDate && !isNaN(formData.startDate.getTime())
             ? getNextOccurrence(formData.startDate, c.timescale || 'weekly')
             : undefined,
         })),
@@ -216,8 +224,16 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                                 name="startDate"
                                 id="startDate"
                                 required
-                                value={formData.startDate ? formData.startDate.toISOString().split('T')[0] : ''}
-                                onChange={(e) => setFormData((prev) => ({ ...prev, startDate: new Date(e.target.value) }))}
+                                value={formData.startDate && !isNaN(formData.startDate.getTime()) 
+                                  ? formData.startDate.toISOString().split('T')[0] 
+                                  : new Date().toISOString().split('T')[0]
+                                }
+                                onChange={(e) => {
+                                  const date = new Date(e.target.value);
+                                  if (!isNaN(date.getTime())) {
+                                    setFormData((prev) => ({ ...prev, startDate: date }));
+                                  }
+                                }}
                                 className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
                               />
                             </div>
@@ -233,9 +249,20 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                                 name="targetDate"
                                 id="targetDate"
                                 required
-                                min={formData.startDate?.toISOString().split('T')[0] || ''}
-                                value={formData.targetDate?.toISOString().split('T')[0] || ''}
-                                onChange={(e) => setFormData((prev) => ({ ...prev, targetDate: new Date(e.target.value) }))}
+                                min={formData.startDate && !isNaN(formData.startDate.getTime())
+                                  ? formData.startDate.toISOString().split('T')[0]
+                                  : new Date().toISOString().split('T')[0]
+                                }
+                                value={formData.targetDate && !isNaN(formData.targetDate.getTime())
+                                  ? formData.targetDate.toISOString().split('T')[0]
+                                  : new Date().toISOString().split('T')[0]
+                                }
+                                onChange={(e) => {
+                                  const date = new Date(e.target.value);
+                                  if (!isNaN(date.getTime())) {
+                                    setFormData((prev) => ({ ...prev, targetDate: date }));
+                                  }
+                                }}
                                 className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
                               />
                             </div>
