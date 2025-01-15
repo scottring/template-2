@@ -108,6 +108,7 @@ export interface ItineraryItem {
   type: 'habit' | 'task' | 'event';
   status: 'pending' | 'completed';
   schedule?: Schedule;
+  dueDate?: Date;
   referenceId?: string;
   createdAt: Date;
   updatedAt: Date;

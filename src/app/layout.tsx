@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/lib/contexts/AuthContext";
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import Dashboard from "@/components/dashboard/Dashboard";
-import { ErrorBoundary } from "@/components/error/ErrorBoundary";
+import { RootProvider } from "@/components/providers/RootProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "FamilyGoals - Collaborative Life Planning",
-  description: "Transform your family's aspirations into achievable actions",
+  title: "Symphony - Orchestrate Your Life",
+  description: "Transform your goals into achievable actions with Symphony",
 };
 
 export default function RootLayout({
@@ -21,13 +18,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className={`${inter.className} h-full`}>
-        <AuthProvider>
-          <ErrorBoundary>
-            <ProtectedRoute>
-              <Dashboard>{children}</Dashboard>
-            </ProtectedRoute>
-          </ErrorBoundary>
-        </AuthProvider>
+        <RootProvider>{children}</RootProvider>
       </body>
     </html>
   );

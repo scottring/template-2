@@ -22,9 +22,14 @@ export const SidebarBody = ({ children }: { children: React.ReactNode }) => {
   return (
     <>
       {/* Desktop sidebar */}
-      <div className="hidden md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800 w-[300px] h-full px-4 py-4 flex-shrink-0">
-        <h2 className="text-xl font-semibold mb-4 px-4">FamilyGoals</h2>
-        <div className="flex-1">
+      <div className="hidden md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800 w-[300px] h-full flex-shrink-0">
+        <div className="px-3 py-6">
+          <h2 className="text-xl font-semibold">
+            <span className="block">Symphony</span>
+            <span className="block">Planner</span>
+          </h2>
+        </div>
+        <div className="flex-1 px-3">
           {children}
         </div>
         <UserProfile />
@@ -54,9 +59,12 @@ export const SidebarBody = ({ children }: { children: React.ReactNode }) => {
           />
 
           {/* Sidebar content */}
-          <div className="relative h-full w-[300px] bg-neutral-100 dark:bg-neutral-800 px-4 py-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold px-4">FamilyGoals</h2>
+          <div className="relative h-full w-[300px] bg-neutral-100 dark:bg-neutral-800">
+            <div className="flex justify-between items-center px-3 py-6">
+              <h2 className="text-xl font-semibold">
+                <span className="block">Symphony</span>
+                <span className="block">Planner</span>
+              </h2>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
                 className="p-2 rounded-md text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700"
@@ -64,7 +72,7 @@ export const SidebarBody = ({ children }: { children: React.ReactNode }) => {
                 <X className="h-6 w-6" />
               </button>
             </div>
-            <div className="flex-1">
+            <div className="flex-1 px-3">
               {children}
             </div>
             <UserProfile />

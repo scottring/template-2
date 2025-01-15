@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -12,103 +13,152 @@ import {
   CalendarDays,
   CalendarRange,
   CalendarClock,
-  Workflow
+  Workflow,
+  ChevronDown,
+  ChevronRight,
+  Map,
+  ListTodo,
+  MapPin,
+  BrickWall,
+  Hammer
 } from 'lucide-react';
 
-const navigation = [
+interface BaseNavItem {
+  name: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+interface NavItemWithHref extends BaseNavItem {
+  href: string;
+  children?: never;
+}
+
+interface NavItemWithChildren extends BaseNavItem {
+  href?: never;
+  children: NavItemWithHref[];
+}
+
+type NavItem = NavItemWithHref | NavItemWithChildren;
+
+const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Goals', href: '/goals', icon: Target },
-  { name: 'Tasks', href: '/tasks', icon: ClipboardList },
+  { name: 'Calendar', href: '/calendar', icon: Calendar },
+  { name: 'Itinerary', href: '/itinerary', icon: Map },
   {
-    name: 'Workflows',
-    icon: Workflow,
+    name: 'Foundations',
+    icon: BrickWall,
     children: [
-      { name: 'Planning', href: '/planning', icon: Calendar },
-      { name: 'Weekly Planning', href: '/planning/weekly', icon: CalendarDays },
-      { name: 'Monthly Planning', href: '/planning/monthly', icon: CalendarRange },
-      { name: 'Quarterly Planning', href: '/planning/quarterly', icon: CalendarClock },
+      { name: 'Areas', href: '/areas', icon: MapPin },
+      { name: 'Goals', href: '/goals', icon: Target },
+      { name: 'Tasks', href: '/tasks', icon: ListTodo },   
     ],
   },
-  { name: 'Calendar', href: '/calendar', icon: Calendar },
+  
+ {
+    name: 'Action',
+    icon: Hammer,
+    children: [      
+      { name: 'Weekly Planning & Review', href: '/planning/weekly', icon: CalendarDays },
+      { name: 'Monthly Planning & Review', href: '/planning/monthly', icon: CalendarRange },
+      { name: 'Quarterly Planning & Review', href: '/planning/quarterly', icon: CalendarClock },
+    ],
+  },
+
   { name: 'Family', href: '/family', icon: Users },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
+function hasChildren(item: NavItem): item is NavItemWithChildren {
+  return 'children' in item && Array.isArray(item.children);
+}
+
 export function Navigation() {
   const pathname = usePathname();
+  const [openSections, setOpenSections] = useState<string[]>([]);
+
+  const toggleSection = (name: string) => {
+    setOpenSections(prev =>
+      prev.includes(name)
+        ? prev.filter(item => item !== name)
+        : [...prev, name]
+    );
+  };
+
+  const NavLink = ({ item, nested = false }: { item: NavItemWithHref; nested?: boolean }) => {
+    const isActive = pathname === item.href;
+    const Icon = item.icon;
+
+    return (
+      <Link
+        href={item.href}
+        className={cn(
+          'group flex items-center gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold',
+          isActive
+            ? 'bg-gray-50 text-blue-600'
+            : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50',
+          nested && 'ml-7'
+        )}
+      >
+        <Icon
+          className={cn(
+            'h-6 w-6 shrink-0',
+            isActive
+              ? 'text-blue-600'
+              : 'text-gray-400 group-hover:text-blue-600'
+          )}
+          aria-hidden="true"
+        />
+        {item.name}
+      </Link>
+    );
+  };
+
+  const NavSection = ({ item }: { item: NavItemWithChildren }) => {
+    const Icon = item.icon;
+    const isOpen = openSections.includes(item.name);
+
+    return (
+      <div>
+        <button
+          onClick={() => toggleSection(item.name)}
+          className="group flex w-full items-center gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+        >
+          <Icon
+            className="h-6 w-6 shrink-0 text-gray-400 group-hover:text-blue-600"
+            aria-hidden="true"
+          />
+          {item.name}
+          {isOpen ? (
+            <ChevronDown className="ml-auto h-5 w-5" />
+          ) : (
+            <ChevronRight className="ml-auto h-5 w-5" />
+          )}
+        </button>
+        {isOpen && (
+          <div className="mt-1">
+            {item.children.map((child) => (
+              <NavLink key={child.href} item={child} nested />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <nav className="flex flex-1 flex-col">
       <ul role="list" className="flex flex-1 flex-col gap-y-7">
         <li>
           <ul role="list" className="-mx-2 space-y-1">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href;
-              const isParentActive = item.children?.some(child => pathname === child.href);
-
-              if (item.children) {
-                return (
-                  <li key={item.name}>
-                    <div className="flex items-center gap-x-3 p-2 text-sm font-semibold leading-6 text-gray-700">
-                      <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                      {item.name}
-                    </div>
-                    <ul role="list" className="ml-6 space-y-1">
-                      {item.children.map((child) => {
-                        const ChildIcon = child.icon;
-                        const isChildActive = pathname === child.href;
-                        return (
-                          <li key={child.name}>
-                            <Link
-                              href={child.href}
-                              className={cn(
-                                isChildActive
-                                  ? 'bg-gray-50 text-blue-600'
-                                  : 'hover:text-blue-600 hover:bg-gray-50',
-                                'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
-                              )}
-                            >
-                              <ChildIcon
-                                className={cn(
-                                  isChildActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-600',
-                                  'h-5 w-5 shrink-0'
-                                )}
-                                aria-hidden="true"
-                              />
-                              {child.name}
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </li>
-                );
-              }
-
-              return (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      isActive
-                        ? 'bg-gray-50 text-blue-600'
-                        : 'hover:text-blue-600 hover:bg-gray-50',
-                      'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
-                    )}
-                  >
-                    <Icon
-                      className={cn(
-                        isActive ? 'text-blue-600' : 'text-gray-400 group-hover:text-blue-600',
-                        'h-5 w-5 shrink-0'
-                      )}
-                      aria-hidden="true"
-                    />
-                    {item.name}
-                  </Link>
-                </li>
-              );
-            })}
+            {navigation.map((item) => (
+              <li key={item.name}>
+                {hasChildren(item) ? (
+                  <NavSection item={item} />
+                ) : (
+                  <NavLink item={item} />
+                )}
+              </li>
+            ))}
           </ul>
         </li>
       </ul>
