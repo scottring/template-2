@@ -18,12 +18,19 @@ interface CreateGoalDialogProps {
   areaId: string;
 }
 
+interface SuccessCriteriaInput extends Omit<SuccessCriteria, 'text'> {
+  text: string;
+  isTracked: boolean;
+  timescale?: TimeScale;
+  frequency?: number;
+}
+
 interface FormData {
   name: string;
   description: string;
   startDate: Date;
   targetDate: Date;
-  successCriteria: SuccessCriteria[];
+  successCriteria: SuccessCriteriaInput[];
   assignedTo: string[];
 }
 
@@ -54,12 +61,19 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
         startDate: formData.startDate,
         targetDate: formData.targetDate,
         progress: 0,
-        successCriteria: formData.successCriteria.map(criteria => ({
-          text: criteria.text || '',
-          isTracked: criteria.isTracked || false,
-          timescale: criteria.timescale || undefined,
-          nextOccurrence: criteria.nextOccurrence || undefined
-        })),
+        successCriteria: formData.successCriteria.map(criteria => {
+          // Construct the criteria text from the structured fields
+          const frequencyText = criteria.isTracked && criteria.frequency && criteria.timescale
+            ? `${criteria.text} ${criteria.frequency} times per ${criteria.timescale}`
+            : criteria.text;
+
+          return {
+            text: frequencyText,
+            isTracked: criteria.isTracked,
+            timescale: criteria.timescale,
+            nextOccurrence: criteria.nextOccurrence
+          };
+        }),
         assignedTo: formData.assignedTo
       };
 
@@ -100,18 +114,25 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
           text: '',
           isTracked: false,
           timescale: undefined,
-          nextOccurrence: undefined
+          frequency: undefined
         }
       ]
     }));
   };
 
-  const handleUpdateCriteria = (index: number, updates: Partial<SuccessCriteria>) => {
+  const handleUpdateCriteria = (index: number, updates: Partial<SuccessCriteriaInput>) => {
     setFormData((prev) => ({
       ...prev,
       successCriteria: prev.successCriteria.map((criteria, i) =>
         i === index ? { ...criteria, ...updates } : criteria
       ),
+    }));
+  };
+
+  const handleRemoveCriteria = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      successCriteria: prev.successCriteria.filter((_, i) => i !== index),
     }));
   };
 
@@ -242,53 +263,73 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
                           </div>
                           <div className="mt-2 space-y-2">
                             {formData.successCriteria.map((criteria, index) => (
-                              <div key={index} className="flex gap-x-2">
-                                <input
-                                  type="text"
-                                  value={criteria.text || ''}
-                                  onChange={(e) => handleUpdateCriteria(index, { text: e.target.value })}
-                                  placeholder="Enter success criteria"
-                                  className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                                />
-                                <div className="flex items-center gap-x-2">
-                                  <label className="text-sm text-gray-600">Track</label>
+                              <div key={index} className="flex gap-4 items-start">
+                                <div className="flex-1 space-y-2">
                                   <input
-                                    type="checkbox"
-                                    checked={criteria.isTracked || false}
-                                    onChange={(e) => handleUpdateCriteria(index, { isTracked: e.target.checked })}
-                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                                    type="text"
+                                    placeholder="Success criteria"
+                                    className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                                    value={criteria.text}
+                                    onChange={(e) => handleUpdateCriteria(index, { text: e.target.value })}
                                   />
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <label className="flex items-center gap-2 text-sm">
+                                      <input
+                                        type="checkbox"
+                                        checked={criteria.isTracked}
+                                        onChange={(e) => handleUpdateCriteria(index, { isTracked: e.target.checked })}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                                      />
+                                      Track in itinerary
+                                    </label>
+
+                                    {criteria.isTracked && (
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="number"
+                                          min="1"
+                                          placeholder="Frequency"
+                                          className="block w-20 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                                          value={criteria.frequency || ''}
+                                          onChange={(e) => handleUpdateCriteria(index, { frequency: parseInt(e.target.value) || undefined })}
+                                        />
+                                        <span className="text-sm text-gray-500">times per</span>
+                                        <select
+                                          className="block rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                                          value={criteria.timescale || ''}
+                                          onChange={(e) => handleUpdateCriteria(index, { timescale: e.target.value as TimeScale || undefined })}
+                                        >
+                                          <option value="">Select period</option>
+                                          <option value="daily">day</option>
+                                          <option value="weekly">week</option>
+                                          <option value="monthly">month</option>
+                                          <option value="quarterly">quarter</option>
+                                          <option value="yearly">year</option>
+                                        </select>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                                {criteria.isTracked && (
-                                  <select
-                                    value={criteria.timescale || ''}
-                                    onChange={(e) => handleUpdateCriteria(index, { 
-                                      timescale: e.target.value as TimeScale,
-                                    })}
-                                    className="rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                                  >
-                                    <option value="">Select Frequency</option>
-                                    <option value="daily">Daily</option>
-                                    <option value="weekly">Weekly</option>
-                                    <option value="monthly">Monthly</option>
-                                  </select>
-                                )}
-                                {formData.successCriteria.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setFormData(prev => ({
-                                        ...prev,
-                                        successCriteria: prev.successCriteria.filter((_, i) => i !== index)
-                                      }));
-                                    }}
-                                    className="inline-flex items-center rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-red-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-red-50"
-                                  >
-                                    <TrashIcon className="h-4 w-4" />
-                                  </button>
-                                )}
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveCriteria(index)}
+                                  className="mt-1 text-gray-400 hover:text-gray-500"
+                                >
+                                  <TrashIcon className="h-5 w-5" />
+                                </button>
                               </div>
                             ))}
+
+                            <button
+                              type="button"
+                              onClick={handleAddCriteria}
+                              className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+                            >
+                              <PlusIcon className="h-4 w-4" />
+                              Add success criteria
+                            </button>
                           </div>
                         </div>
 
