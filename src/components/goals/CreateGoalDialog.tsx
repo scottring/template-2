@@ -1,75 +1,100 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
-import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon, Share2 } from 'lucide-react';
+import { Fragment } from 'react';
+import { addMonths } from 'date-fns';
+import { Goal, TimeScale, SuccessCriteria } from '@/types/models';
+import useItineraryStore from '@/lib/stores/useItineraryStore';
 import { useGoalStore } from '@/lib/stores/useGoalStore';
 import { useUserStore } from '@/lib/stores/useUserStore';
+import { getNextOccurrence } from '@/lib/utils/itineraryGeneration';
+import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon } from 'lucide-react';
 import { UserSelect } from '@/components/shared/UserSelect';
 
 interface CreateGoalDialogProps {
-  areaId: string;
   open: boolean;
   onClose: () => void;
+  areaId: string;
 }
 
-export function CreateGoalDialog({ areaId, open, onClose }: CreateGoalDialogProps) {
-  const addGoal = useGoalStore((state) => state.addGoal);
-  const [formData, setFormData] = useState({
+interface FormData {
+  name: string;
+  description: string;
+  startDate: Date;
+  targetDate: Date;
+  successCriteria: SuccessCriteria[];
+  assignedTo: string[];
+}
+
+export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProps) {
+  const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
-    areaId: areaId,
-    targetDate: new Date(),
-    successCriteria: [''],
-    progress: 0,
-    assignedTo: [] as string[],
+    startDate: new Date(),
+    targetDate: addMonths(new Date(), 1),
+    successCriteria: [],
+    assignedTo: []
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { generateFromGoal } = useItineraryStore();
+  const { addGoal } = useGoalStore();
+  const { users } = useUserStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    if (!formData.name) return;
 
     try {
-      await addGoal({
-        ...formData,
-        successCriteria: formData.successCriteria.filter(Boolean),
-      });
+      const goalData: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'> = {
+        name: formData.name,
+        description: formData.description,
+        areaId,
+        startDate: formData.startDate,
+        targetDate: formData.targetDate,
+        progress: 0,
+        successCriteria: formData.successCriteria,
+        assignedTo: formData.assignedTo
+      };
+
+      await addGoal(goalData);
+      generateFromGoal({ ...goalData, id: crypto.randomUUID(), createdAt: new Date(), updatedAt: new Date() });
+
       onClose();
       setFormData({
         name: '',
         description: '',
-        areaId: areaId,
-        targetDate: new Date(),
-        successCriteria: [''],
-        progress: 0,
-        assignedTo: [],
+        startDate: new Date(),
+        targetDate: addMonths(new Date(), 1),
+        successCriteria: [],
+        assignedTo: []
       });
     } catch (error) {
       console.error('Error creating goal:', error);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  const addCriteria = () => {
-    setFormData((prev) => ({
+  const handleAddCriteria = () => {
+    setFormData(prev => ({
       ...prev,
-      successCriteria: [...prev.successCriteria, ''],
+      successCriteria: [
+        ...prev.successCriteria,
+        {
+          text: '',
+          isTracked: false,
+          timescale: undefined,
+          nextOccurrence: undefined
+        }
+      ]
     }));
   };
 
-  const removeCriteria = (index: number) => {
+  const handleUpdateCriteria = (index: number, updates: Partial<SuccessCriteria>) => {
     setFormData((prev) => ({
       ...prev,
-      successCriteria: prev.successCriteria.filter((_, i) => i !== index),
-    }));
-  };
-
-  const updateCriteria = (index: number, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      successCriteria: prev.successCriteria.map((c, i) => (i === index ? value : c)),
+      successCriteria: prev.successCriteria.map((criteria, i) =>
+        i === index ? { ...criteria, ...updates } : criteria
+      ),
     }));
   };
 
@@ -151,6 +176,23 @@ export function CreateGoalDialog({ areaId, open, onClose }: CreateGoalDialogProp
                         </div>
 
                         <div>
+                          <label htmlFor="startDate" className="block text-sm font-medium leading-6 text-gray-900">
+                            Start Date
+                          </label>
+                          <div className="mt-2">
+                            <input
+                              type="date"
+                              name="startDate"
+                              id="startDate"
+                              required
+                              value={formData.startDate.toISOString().split('T')[0]}
+                              onChange={(e) => setFormData((prev) => ({ ...prev, startDate: new Date(e.target.value) }))}
+                              className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
                           <label htmlFor="targetDate" className="block text-sm font-medium leading-6 text-gray-900">
                             Target Date
                           </label>
@@ -174,7 +216,7 @@ export function CreateGoalDialog({ areaId, open, onClose }: CreateGoalDialogProp
                             </label>
                             <button
                               type="button"
-                              onClick={addCriteria}
+                              onClick={handleAddCriteria}
                               className="inline-flex items-center rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
                             >
                               <PlusIcon className="h-4 w-4 mr-1" />
@@ -186,15 +228,43 @@ export function CreateGoalDialog({ areaId, open, onClose }: CreateGoalDialogProp
                               <div key={index} className="flex gap-x-2">
                                 <input
                                   type="text"
-                                  value={criteria}
-                                  onChange={(e) => updateCriteria(index, e.target.value)}
+                                  value={criteria.text || ''}
+                                  onChange={(e) => handleUpdateCriteria(index, { text: e.target.value })}
                                   placeholder="Enter success criteria"
                                   className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
                                 />
+                                <div className="flex items-center gap-x-2">
+                                  <label className="text-sm text-gray-600">Track</label>
+                                  <input
+                                    type="checkbox"
+                                    checked={criteria.isTracked || false}
+                                    onChange={(e) => handleUpdateCriteria(index, { isTracked: e.target.checked })}
+                                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
+                                  />
+                                </div>
+                                {criteria.isTracked && (
+                                  <select
+                                    value={criteria.timescale || ''}
+                                    onChange={(e) => handleUpdateCriteria(index, { 
+                                      timescale: e.target.value as TimeScale,
+                                    })}
+                                    className="rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                                  >
+                                    <option value="">Select Frequency</option>
+                                    <option value="daily">Daily</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                  </select>
+                                )}
                                 {formData.successCriteria.length > 1 && (
                                   <button
                                     type="button"
-                                    onClick={() => removeCriteria(index)}
+                                    onClick={() => {
+                                      setFormData(prev => ({
+                                        ...prev,
+                                        successCriteria: prev.successCriteria.filter((_, i) => i !== index)
+                                      }));
+                                    }}
                                     className="inline-flex items-center rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-red-700 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-red-50"
                                   >
                                     <TrashIcon className="h-4 w-4" />
@@ -206,27 +276,14 @@ export function CreateGoalDialog({ areaId, open, onClose }: CreateGoalDialogProp
                         </div>
 
                         <div>
-                          <div className="flex items-center gap-x-2">
-                            <Share2 className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                            <label htmlFor="assignedTo" className="block text-sm font-medium leading-6 text-gray-900">
-                              Share with Family Members
-                            </label>
-                          </div>
-                          <p className="mt-1 text-sm text-gray-500">
-                            Select family members to share and collaborate on this goal
-                          </p>
+                          <label className="block text-sm font-medium leading-6 text-gray-900">
+                            Assign To
+                          </label>
                           <div className="mt-2">
                             <UserSelect
-                              users={useUserStore.getState().users}
+                              users={users}
                               selectedUserIds={formData.assignedTo}
-                              onSelect={(userId) => {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  assignedTo: prev.assignedTo.includes(userId)
-                                    ? prev.assignedTo.filter((id) => id !== userId)
-                                    : [...prev.assignedTo, userId]
-                                }));
-                              }}
+                              onSelect={(userIds: string[]) => setFormData(prev => ({ ...prev, assignedTo: userIds }))}
                             />
                           </div>
                         </div>
@@ -234,10 +291,9 @@ export function CreateGoalDialog({ areaId, open, onClose }: CreateGoalDialogProp
                         <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
                           <button
                             type="submit"
-                            disabled={isSubmitting}
-                            className="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 sm:ml-3 sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 sm:ml-3 sm:w-auto"
                           >
-                            {isSubmitting ? 'Creating...' : 'Create Goal'}
+                            Create Goal
                           </button>
                           <button
                             type="button"

@@ -31,12 +31,19 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'goals', params.id), (doc) => {
       if (doc.exists()) {
+        const data = doc.data();
         setGoal({
           id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate(),
-          updatedAt: doc.data().updatedAt?.toDate(),
-          targetDate: doc.data().targetDate?.toDate(),
+          ...data,
+          successCriteria: data.successCriteria?.map((criteria: any) => ({
+            text: criteria.text || '',
+            isTracked: criteria.isTracked || false,
+            timescale: criteria.timescale,
+            nextOccurrence: criteria.nextOccurrence?.toDate()
+          })) || [],
+          createdAt: data.createdAt?.toDate(),
+          updatedAt: data.updatedAt?.toDate(),
+          targetDate: data.targetDate?.toDate(),
         } as Goal);
       } else {
         router.push('/areas');
@@ -262,7 +269,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
                       {goal.successCriteria.map((criteria, index) => (
                         <li key={index} className="flex items-start gap-x-2">
                           <CheckCircle className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                          <span>{criteria}</span>
+                          <span>{criteria.text}</span>
                         </li>
                       ))}
                     </ul>

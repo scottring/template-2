@@ -117,6 +117,7 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
                 </Menu.Button>
                 <Transition
                   as={Fragment}
+                  show={true}
                   enter="transition ease-out duration-100"
                   enterFrom="transform opacity-0 scale-95"
                   enterTo="transform opacity-100 scale-100"
@@ -176,7 +177,7 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
                 <ul className="mt-2 space-y-1">
                   {goal.successCriteria.map((criteria, index) => (
                     <li key={index} className="text-sm text-gray-500">
-                      • {criteria}
+                      • {criteria.text}
                     </li>
                   ))}
                 </ul>

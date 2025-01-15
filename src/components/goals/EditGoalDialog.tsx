@@ -4,6 +4,8 @@ import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon } from 'lucide-react';
 import { useGoalStore } from '@/lib/stores/useGoalStore';
+import { useUserStore } from '@/lib/stores/useUserStore';
+import { UserSelect } from '@/components/shared/UserSelect';
 import { Goal } from '@/types/models';
 import { getNextOccurrence } from '@/lib/utils/itineraryGeneration';
 
@@ -21,6 +23,7 @@ interface EditGoalDialogProps {
 
 export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
   const updateGoal = useGoalStore((state) => state.updateGoal);
+  const { users } = useUserStore();
   const [formData, setFormData] = useState<{
     name: string;
     description: string;
@@ -28,6 +31,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
     targetDate: Date | null;
     successCriteria: SuccessCriteria[];
     progress: number;
+    assignedTo: string[];
   }>({
     name: '',
     description: '',
@@ -35,6 +39,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
     targetDate: null,
     successCriteria: [],
     progress: 0,
+    assignedTo: [],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -62,6 +67,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
           })
         : [],
       progress: goal.progress || 0,
+      assignedTo: goal.assignedTo || [],
     });
   }, [goal]);
 
@@ -320,6 +326,19 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                                 </div>
                               </div>
                             ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium leading-6 text-gray-900">
+                            Assign To
+                          </label>
+                          <div className="mt-2">
+                            <UserSelect
+                              users={users}
+                              selectedUserIds={formData.assignedTo}
+                              onSelect={(userIds: string[]) => setFormData(prev => ({ ...prev, assignedTo: userIds }))}
+                            />
                           </div>
                         </div>
 
