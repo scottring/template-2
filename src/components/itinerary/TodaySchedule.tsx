@@ -1,7 +1,7 @@
 'use client';
 
 import { format } from 'date-fns';
-import { CheckCircle2, Circle } from 'lucide-react';
+import { CheckCircle2, Circle, ArrowUpRight } from 'lucide-react';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
 import { useGoalStore } from '@/lib/stores/useGoalStore';
 import { Goal, SuccessCriteria } from '@/types/models';
@@ -22,9 +22,7 @@ export function TodaySchedule({ date }: TodayScheduleProps) {
   useEffect(() => {
     const loadGoalsData = async () => {
       try {
-        console.log('Loading goals...');
         await loadGoals();
-        console.log('Goals loaded:', goals);
       } catch (error) {
         console.error('Error loading goals:', error);
       }
@@ -34,10 +32,7 @@ export function TodaySchedule({ date }: TodayScheduleProps) {
 
   // Get goal information for each item
   const itemsWithContext = items.map(item => {
-    // For habits, the referenceId is the goalId
-    const goalId = item.type === 'habit' ? item.referenceId : null;
-    console.log('Looking for goal:', goalId, 'in goals:', goals);
-    const goal = goalId ? goals.find((g: Goal) => g.id === goalId) : null;
+    const goal = item.referenceId ? goals.find((g: Goal) => g.id === item.referenceId) : null;
     const criteria = goal?.successCriteria.find((c: SuccessCriteria) => 
       c.text === item.notes && c.isTracked && c.timescale === item.timescale
     );
@@ -49,24 +44,33 @@ export function TodaySchedule({ date }: TodayScheduleProps) {
     if ((e.target as HTMLElement).closest('button')) return;
     
     if (item.goal?.id) {
-      console.log('Navigating to goal:', item.goal.id);
       router.push(`/goals/${item.goal.id}`);
-    } else {
-      console.log('No goal found for item:', item, 'Available goals:', goals);
     }
   };
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-lg font-semibold mb-4">
-        Today's Schedule ({format(date, 'MMM d')})
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold">
+          Today's Schedule ({format(date, 'MMM d')})
+        </h2>
+        <button
+          onClick={() => {
+            if (confirm('Are you sure you want to clear all itinerary items? This cannot be undone.')) {
+              useItineraryStore.getState().clearAllItems();
+            }
+          }}
+          className="text-sm text-red-600 hover:text-red-700"
+        >
+          Clear All Items
+        </button>
+      </div>
       <div className="space-y-4">
         {itemsWithContext.map((item) => (
           <div
             key={item.id}
             onClick={(e) => handleItemClick(item, e)}
-            className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-50 cursor-pointer group"
+            className="relative flex items-start gap-3 p-3 rounded-md hover:bg-gray-50 cursor-pointer group"
           >
             <button 
               className="mt-1 text-gray-400 hover:text-green-500"
@@ -82,20 +86,26 @@ export function TodaySchedule({ date }: TodayScheduleProps) {
               )}
             </button>
             <div className="flex-1">
+              {/* Goal Context - Always show at the top */}
+              {item.goal ? (
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-medium text-blue-600 group-hover:text-blue-700">
+                    {item.goal.name}
+                  </p>
+                  <ArrowUpRight className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 mb-1">Unlinked Item</p>
+              )}
+
               <div className="flex items-center gap-2">
-                <span className="font-medium group-hover:text-blue-600">{item.notes}</span>
+                <span className="font-medium">{item.notes}</span>
                 {item.type === 'habit' && (
                   <span className="text-sm text-orange-500">
                     🔥 {getStreak(item.id)} day streak
                   </span>
                 )}
               </div>
-              
-              {item.goal && (
-                <p className="text-sm text-gray-500 group-hover:text-blue-500">
-                  Part of: {item.goal.name}
-                </p>
-              )}
 
               {item.type === 'habit' && item.timescale && (
                 <p className="text-sm text-gray-500">

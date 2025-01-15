@@ -95,6 +95,8 @@ export interface ItineraryItem {
   referenceId: string;
   status: 'pending' | 'completed' | 'deferred' | 'cancelled';
   notes?: string;
+  parentId?: string;
+  goalId?: string;
 }
 
 export interface Itinerary {

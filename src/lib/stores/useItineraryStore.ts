@@ -32,9 +32,20 @@ interface ItemProgress {
   lastUpdatedAt: Date;
 }
 
-interface HabitWithProgress extends Omit<Habit, 'progress'> {
+interface HabitWithProgress {
+  id: string;
+  name: string;
+  description: string;
+  referenceId: string;
+  frequency: {
+    type: 'daily' | 'weekly' | 'monthly';
+    value: number;
+  };
   progress: ItemProgress;
   streak: number;
+  assignedTo: string[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface ItineraryState {
@@ -47,6 +58,7 @@ interface ItineraryState {
   updateItem: (id: string, updates: Partial<ItineraryItem>) => void;
   removeItem: (id: string) => void;
   completeItem: (id: string, completed: boolean) => void;
+  clearAllItems: () => void;
   
   // Goal Integration
   generateFromGoal: (goal: Goal) => void;
@@ -124,23 +136,37 @@ const useItineraryStore = create<ItineraryState>()(
 
       // Goal Integration
       generateFromGoal: (goal) => {
+        console.log('Generating habits for goal:', { id: goal.id, name: goal.name });
         const trackedCriteria = goal.successCriteria.filter(c => c.isTracked && c.timescale);
-        const existingItemIds = get().items
-          .filter(item => item.referenceId === goal.id && item.type === 'habit')
-          .map(item => item.id);
+        console.log('Tracked criteria:', trackedCriteria);
 
+        // First, remove any existing habits for this goal
+        set((state) => ({
+          items: state.items.filter((item) => 
+            !(item.referenceId === goal.id && item.type === 'habit')
+          )
+        }));
+
+        // Then create new habits
         trackedCriteria.forEach(criteria => {
+          // Create a unique ID that includes both goal ID and criteria text
           const itemId = `${goal.id}-${criteria.text}`;
-          if (existingItemIds.includes(itemId)) return;
 
           const item: ItineraryItem = {
             id: itemId,
             type: 'habit',
-            referenceId: goal.id,
+            referenceId: goal.id, // This is crucial - it links the habit to the goal
             status: 'pending',
             notes: criteria.text,
             timescale: criteria.timescale
           };
+
+          console.log('Creating habit:', { 
+            id: item.id, 
+            referenceId: item.referenceId,
+            notes: item.notes,
+            timescale: item.timescale
+          });
 
           get().addItem(item);
           
@@ -159,6 +185,8 @@ const useItineraryStore = create<ItineraryState>()(
       },
 
       updateFromCriteria: (goalId, criteria) => {
+        console.log('Updating criteria for goal:', goalId);
+        
         // Remove old items for this goal
         set((state) => ({
           items: state.items.filter((item) => 
@@ -168,14 +196,23 @@ const useItineraryStore = create<ItineraryState>()(
 
         // Generate new items
         criteria.filter(c => c.isTracked && c.timescale).forEach(c => {
+          const itemId = `${goalId}-${c.text}`;
+          
           const item: ItineraryItem = {
-            id: `${goalId}-${c.text}`,
+            id: itemId,
             type: 'habit',
-            referenceId: goalId,
+            referenceId: goalId, // Ensure referenceId is set
             status: 'pending',
             notes: c.text,
             timescale: c.timescale
           };
+
+          console.log('Creating habit from criteria:', {
+            id: item.id,
+            referenceId: item.referenceId,
+            notes: item.notes,
+            timescale: item.timescale
+          });
 
           get().addItem(item);
         });
@@ -226,26 +263,31 @@ const useItineraryStore = create<ItineraryState>()(
           .filter((item): item is ItineraryItem & { type: 'habit' } => 
             item.type === 'habit'
           )
-          .map((item) => ({
-            id: item.id,
-            name: item.notes || '',
-            description: '',
-            frequency: {
-              type: (item.timescale === 'daily' || item.timescale === 'weekly' || item.timescale === 'monthly' 
-                ? item.timescale 
-                : 'daily') as 'daily' | 'weekly' | 'monthly',
-              value: 1
-            },
-            progress: state.progress[item.id] || {
+          .map((item) => {
+            const progress = state.progress[item.id] || {
               completed: 0,
               total: 0,
               lastUpdatedAt: new Date()
-            },
-            streak: state.streaks[item.id]?.count || 0,
-            assignedTo: [],
-            createdAt: new Date(),
-            updatedAt: new Date()
-          }));
+            };
+
+            return {
+              id: item.id,
+              name: item.notes || '',
+              description: '',
+              referenceId: item.referenceId,
+              frequency: {
+                type: (item.timescale === 'daily' || item.timescale === 'weekly' || item.timescale === 'monthly' 
+                  ? item.timescale 
+                  : 'daily') as 'daily' | 'weekly' | 'monthly',
+                value: 1
+              },
+              progress,
+              streak: state.streaks[item.id]?.count || 0,
+              assignedTo: [],
+              createdAt: new Date(),
+              updatedAt: new Date()
+            };
+          });
         
         return habits;
       },
@@ -265,8 +307,13 @@ const useItineraryStore = create<ItineraryState>()(
 
           // Check for broken streaks
           if (streak && streak.lastCompletedAt) {
+            // Convert string date to Date object if needed
+            const lastCompletedDate = streak.lastCompletedAt instanceof Date 
+              ? streak.lastCompletedAt 
+              : new Date(streak.lastCompletedAt);
+
             const daysSinceLastCompletion = Math.floor(
-              (new Date().getTime() - streak.lastCompletedAt.getTime()) / 
+              (new Date().getTime() - lastCompletedDate.getTime()) / 
               (1000 * 60 * 60 * 24)
             );
             if (daysSinceLastCompletion > 1) return true;
@@ -274,9 +321,14 @@ const useItineraryStore = create<ItineraryState>()(
 
           // Check for behind schedule
           if (progress) {
+            // Convert string date to Date object if needed
+            const lastUpdatedDate = progress.lastUpdatedAt instanceof Date
+              ? progress.lastUpdatedAt
+              : new Date(progress.lastUpdatedAt);
+
             const isSignificantlyBehind = 
               progress.completed / progress.total < 0.5 &&
-              progress.lastUpdatedAt < addDays(new Date(), -1);
+              lastUpdatedDate < addDays(new Date(), -1);
             if (isSignificantlyBehind) return true;
           }
 
@@ -323,6 +375,14 @@ const useItineraryStore = create<ItineraryState>()(
 
           // TODO: Sync with goal's success criteria progress
         });
+      },
+
+      clearAllItems: () => {
+        set((state) => ({
+          items: [],
+          streaks: {},
+          progress: {}
+        }));
       }
     }),
     {
