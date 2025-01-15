@@ -28,6 +28,7 @@ interface SuccessCriteriaInput {
     id: string;
     text: string;
     completed: boolean;
+    dueDate?: Date;
   }>;
   notes?: Array<{
     id: string;
@@ -410,6 +411,19 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
                                             }}
                                             placeholder="Enter task"
                                             className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                                          />
+                                          <input
+                                            type="date"
+                                            value={task.dueDate ? task.dueDate.toISOString().split('T')[0] : ''}
+                                            onChange={(e) => {
+                                              const updatedTasks = [...(criteria.tasks || [])];
+                                              updatedTasks[taskIndex] = { 
+                                                ...task, 
+                                                dueDate: e.target.value ? new Date(e.target.value) : undefined 
+                                              };
+                                              updateCriteria(index, { tasks: updatedTasks });
+                                            }}
+                                            className="block w-36 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
                                           />
                                           <button
                                             type="button"

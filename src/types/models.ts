@@ -1,4 +1,19 @@
-export type TimeScale = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
+export type TimeScale = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export interface Schedule {
+  startDate: Date;
+  endDate?: Date;
+  recurrence?: {
+    frequency: number;
+    interval: TimeScale;
+  };
+  schedules?: {
+    repeat: {
+      days: number[];
+      times: string[];
+    };
+  }[];
+}
 
 export interface BaseItem {
   id: string;
@@ -47,30 +62,52 @@ export interface NotificationPreferences {
 
 export interface Task extends BaseItem {
   title: string;
-  description?: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: 'high' | 'medium' | 'low';
+  description: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  priority: 'low' | 'medium' | 'high';
   category: TaskCategory;
+  assignedTo: string[];
+  householdId: string;
+  goalId?: string;
+  criteriaId?: string;
   dueDate?: Date;
   completedAt?: Date;
-  assignedTo: string[];
-  recurrence?: RecurrencePattern;
-  notes?: Note[];
-  checklist?: ChecklistItem[];
-  tags: string[];
+  checklist: ChecklistItem[];
+  notes: Note[];
 }
 
-export type TaskCategory = 
-  | 'chore' 
-  | 'errand' 
-  | 'maintenance' 
-  | 'kids' 
-  | 'meal' 
-  | 'shopping'
-  | 'finance'
-  | 'health'
-  | 'social'
-  | 'other';
+export interface Goal extends BaseItem {
+  name: string;
+  description: string;
+  areaId: string;
+  startDate: Date;
+  targetDate: Date;
+  progress: number;
+  status: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
+  successCriteria: SuccessCriteria[];
+  assignedTo: string[];
+  householdId: string;
+}
+
+export interface Area extends BaseItem {
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  parentId?: string;
+  householdId: string;
+}
+
+export interface SuccessCriteria {
+  id: string;
+  text: string;
+  isTracked: boolean;
+  timescale?: TimeScale;
+  frequency?: number;
+  nextOccurrence?: Date;
+  tasks: { id: string; text: string; completed: boolean; }[];
+  notes: { id: string; text: string; timestamp: Date; }[];
+}
 
 export interface ChecklistItem {
   id: string;
@@ -83,67 +120,20 @@ export interface ChecklistItem {
 export interface Note {
   id: string;
   text: string;
+  type: 'comment' | 'update' | 'question';
   createdAt: Date;
   createdBy: string;
-  type: 'comment' | 'update' | 'question';
 }
 
-export interface RecurrencePattern {
-  frequency: number;
-  interval: TimeScale;
-  endAfter?: number;
-  endDate?: Date;
-  daysOfWeek?: number[]; // 0-6 for Sunday-Saturday
-  dayOfMonth?: number;
-  monthOfYear?: number;
-  skipHolidays?: boolean;
-}
-
-export interface Goal extends BaseItem {
-  name: string;
-  description: string;
-  startDate: Date;
-  targetDate: Date;
-  progress: number;
-  status: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
-  successCriteria: SuccessCriteria[];
-  assignedTo: string[];
-  areaId: string;
-}
-
-export interface SuccessCriteria {
-  text: string;
-  isTracked: boolean;
+export interface ItineraryItem extends BaseItem {
+  type: 'task' | 'habit' | 'event';
+  referenceId: string;
+  criteriaId?: string;
+  schedule: Schedule;
+  status: 'pending' | 'completed' | 'cancelled';
+  notes?: string;
   timescale?: TimeScale;
-  frequency?: number;
-  nextOccurrence?: Date;
-  tasks?: Array<{
-    id: string;
-    text: string;
-    completed: boolean;
-  }>;
-  notes?: Array<{
-    id: string;
-    text: string;
-    timestamp: Date;
-  }>;
+  dueDate?: Date;
 }
 
-export interface Area extends BaseItem {
-  name: string;
-  description: string;
-  color: string;
-  icon: string;
-  goals: string[]; // Goal IDs
-  parentId?: string;
-}
-
-export interface Project extends BaseItem {
-  name: string;
-  description: string;
-  goalId: string;
-  startDate: Date;
-  endDate: Date;
-  status: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
-  assignedTo: string[];
-}
+export type TaskCategory = 'chore' | 'errand' | 'maintenance' | 'kids' | 'meal' | 'shopping' | 'finance' | 'health' | 'social' | 'other';

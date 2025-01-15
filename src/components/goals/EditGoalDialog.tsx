@@ -8,6 +8,8 @@ import { useUserStore } from '@/lib/stores/useUserStore';
 import { UserSelect } from '@/components/shared/UserSelect';
 import { Goal, SuccessCriteria } from '@/types/models';
 import { getNextOccurrence } from '@/lib/utils/itineraryGeneration';
+import { useTaskStore } from '@/lib/stores/useTaskStore';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 interface EditGoalDialogProps {
   goal: Goal;
@@ -16,26 +18,25 @@ interface EditGoalDialogProps {
 }
 
 export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
-  const updateGoal = useGoalStore((state) => state.updateGoal);
+  const { user } = useAuth();
+  const { updateGoal } = useGoalStore();
+  const { createTask } = useTaskStore();
   const { users } = useUserStore();
-  const [formData, setFormData] = useState<{
-    name: string;
-    description: string;
-    startDate: Date | null;
-    targetDate: Date | null;
-    successCriteria: SuccessCriteria[];
-    progress: number;
-    assignedTo: string[];
-  }>({
-    name: '',
-    description: '',
-    startDate: null,
-    targetDate: null,
-    successCriteria: [],
-    progress: 0,
-    assignedTo: [],
-  });
+  const [formData, setFormData] = useState<Goal>(() => ({
+    ...goal,
+    successCriteria: goal.successCriteria.map(c => ({
+      id: c.id || crypto.randomUUID(),
+      text: c.text,
+      isTracked: c.isTracked,
+      timescale: c.timescale,
+      frequency: c.frequency,
+      nextOccurrence: c.nextOccurrence,
+      tasks: c.tasks || [],
+      notes: c.notes || []
+    }))
+  }));
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [expandedCriteria, setExpandedCriteria] = useState<string[]>([]);
 
   useEffect(() => {
     if (!goal) return;
@@ -77,61 +78,89 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
 
   if (!goal) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.startDate || !formData.targetDate) return;
-    
-    if (isNaN(formData.startDate.getTime()) || isNaN(formData.targetDate.getTime())) {
-      console.error('Invalid date values');
-      return;
-    }
-    
-    setIsSubmitting(true);
+  const addCriteria = () => {
+    const newCriteria: SuccessCriteria = {
+      id: crypto.randomUUID(),
+      text: '',
+      isTracked: false,
+      tasks: [],
+      notes: []
+    };
+
+    setFormData(prev => ({
+      ...prev,
+      successCriteria: [...prev.successCriteria, newCriteria]
+    }));
+  };
+
+  const addTask = async (criteriaIndex: number, text: string) => {
+    if (!user || !formData.startDate || !formData.householdId) return;
 
     try {
-      await updateGoal(goal.id, {
-        ...formData,
-        startDate: formData.startDate,
-        targetDate: formData.targetDate,
-        successCriteria: formData.successCriteria.map(c => {
-          const criteria: any = {
-            text: c.text,
-            isTracked: c.isTracked,
-            tasks: c.tasks || [],
-            notes: c.notes || []
-          };
-          
-          if (c.isTracked) {
-            criteria.timescale = c.timescale || 'weekly';
-            criteria.frequency = c.frequency || 1;
-            if (formData.startDate && !isNaN(formData.startDate.getTime())) {
-              criteria.nextOccurrence = getNextOccurrence(formData.startDate, criteria.timescale);
-            }
-          }
-          
-          return criteria;
-        }),
+      // Create the task in the task store
+      const taskId = await createTask({
+        title: text,
+        description: `Task for success criterion: ${formData.successCriteria[criteriaIndex].text}`,
+        status: 'pending',
+        priority: 'medium',
+        category: 'other',
+        assignedTo: [user.uid],
+        householdId: formData.householdId,
+        goalId: formData.id,
+        criteriaId: formData.successCriteria[criteriaIndex].id,
+        dueDate: formData.targetDate || undefined,
+        checklist: [],
+        notes: []
       });
-      onClose();
+
+      // Update the success criteria with the task reference
+      const updatedCriteria = [...formData.successCriteria];
+      updatedCriteria[criteriaIndex].tasks.push({
+        id: taskId,
+        text,
+        completed: false
+      });
+
+      setFormData(prev => ({
+        ...prev,
+        successCriteria: updatedCriteria
+      }));
     } catch (error) {
-      console.error('Error updating goal:', error);
-    } finally {
-      setIsSubmitting(false);
+      console.error('Error adding task:', error);
     }
   };
 
-  const addCriteria = () => {
-    setFormData((prev) => ({
-      ...prev,
-      successCriteria: [...prev.successCriteria, { 
-        text: '',
-        isTracked: false,
-        timescale: undefined,
-        frequency: 1,
-        tasks: [],
-        notes: []
-      }],
-    }));
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !formData.startDate || !formData.targetDate || !formData.householdId) return;
+
+    try {
+      const updatedGoal: Partial<Goal> = {
+        ...formData,
+        startDate: formData.startDate,
+        targetDate: formData.targetDate,
+        status: formData.status,
+        successCriteria: formData.successCriteria.map(c => ({
+          id: c.id,
+          text: c.text,
+          isTracked: c.isTracked,
+          timescale: c.timescale,
+          frequency: c.frequency,
+          nextOccurrence: c.isTracked && formData.startDate
+            ? getNextOccurrence(formData.startDate, c.timescale || 'weekly')
+            : undefined,
+          tasks: c.tasks,
+          notes: c.notes
+        })),
+        updatedAt: new Date(),
+        updatedBy: user.uid
+      };
+
+      await updateGoal(goal.id, updatedGoal);
+      onClose();
+    } catch (error) {
+      console.error('Error updating goal:', error);
+    }
   };
 
   const removeCriteria = (index: number) => {
@@ -420,6 +449,19 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                                             }}
                                             placeholder="Enter task"
                                             className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+                                          />
+                                          <input
+                                            type="date"
+                                            value={task.dueDate ? task.dueDate.toISOString().split('T')[0] : ''}
+                                            onChange={(e) => {
+                                              const updatedTasks = [...(criteria.tasks || [])];
+                                              updatedTasks[taskIndex] = { 
+                                                ...task, 
+                                                dueDate: e.target.value ? new Date(e.target.value) : undefined 
+                                              };
+                                              updateCriteria(index, { tasks: updatedTasks });
+                                            }}
+                                            className="block w-36 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
                                           />
                                           <button
                                             type="button"
