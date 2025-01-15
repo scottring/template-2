@@ -17,11 +17,11 @@ import { addDays, addWeeks, startOfWeek, setHours, setMinutes } from 'date-fns';
 interface Settings {
   weeklyPlanningDay: number; // 0-6 for Sunday-Saturday
   weeklyPlanningTime: string; // HH:mm format
-  autoScheduleItems: boolean;
-  sendReminders: boolean;
+  autoScheduleWeeklyPlanning: boolean;
+  reminderEnabled: boolean;
   reminderHoursBefore: number;
-  defaultMeetingTime: string; // HH:mm format
-  defaultMeetingDuration: number; // minutes
+  defaultWeeklyMeetingDay: number | null; // 0-6 for Sunday-Saturday
+  defaultWeeklyMeetingTime: string | null; // HH:mm format
   colorScheme: string;
   defaultView: 'day' | 'week' | 'month';
   notifications: NotificationPreferences;
@@ -34,7 +34,7 @@ interface SettingsStore {
   
   // Settings Management
   loadSettings: (userId: string) => Promise<void>;
-  updateSettings: (updates: Partial<Settings>) => Promise<void>;
+  saveSettings: (userId: string, settings: Settings) => Promise<void>;
   resetSettings: () => Promise<void>;
   
   // Calculations
@@ -48,11 +48,11 @@ interface SettingsStore {
 const defaultSettings: Settings = {
   weeklyPlanningDay: 0, // Sunday
   weeklyPlanningTime: '09:00',
-  autoScheduleItems: true,
-  sendReminders: true,
+  autoScheduleWeeklyPlanning: true,
+  reminderEnabled: true,
   reminderHoursBefore: 24,
-  defaultMeetingTime: '10:00',
-  defaultMeetingDuration: 60,
+  defaultWeeklyMeetingDay: null,
+  defaultWeeklyMeetingTime: null,
   colorScheme: 'system',
   defaultView: 'week',
   notifications: {
@@ -93,20 +93,21 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     }
   },
 
-  updateSettings: async (updates) => {
+  saveSettings: async (userId, settings) => {
     try {
       set({ isLoading: true, error: null });
       
-      const { settings } = get();
-      if (!settings) throw new Error('Settings not loaded');
-
-      const updatedSettings = { ...settings, ...updates };
-      const userId = 'TODO'; // TODO: Get current user ID
+      // Convert undefined values to null for Firestore
+      const firestoreSettings = {
+        ...settings,
+        defaultWeeklyMeetingDay: settings.defaultWeeklyMeetingDay ?? null,
+        defaultWeeklyMeetingTime: settings.defaultWeeklyMeetingTime ?? null,
+      };
       
       const settingsRef = doc(db, 'settings', userId);
-      await updateDoc(settingsRef, updates);
+      await updateDoc(settingsRef, firestoreSettings);
       
-      set({ settings: updatedSettings });
+      set({ settings });
 
     } catch (error) {
       set({ error: 'Failed to update settings' });
@@ -158,15 +159,21 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   getNextTeamMeeting: () => {
     const { settings } = get();
-    if (!settings) return new Date();
+    if (!settings || !settings.defaultWeeklyMeetingDay || !settings.defaultWeeklyMeetingTime) {
+      return new Date();
+    }
 
     const now = new Date();
-    const [hours, minutes] = settings.defaultMeetingTime.split(':').map(Number);
-    let nextMeeting = setHours(setMinutes(now, minutes), hours);
+    const currentWeek = startOfWeek(now);
     
-    // If the next meeting time is in the past, move to tomorrow
+    // Get the next meeting day this week
+    let nextMeeting = addDays(currentWeek, settings.defaultWeeklyMeetingDay);
+    const [hours, minutes] = settings.defaultWeeklyMeetingTime.split(':').map(Number);
+    nextMeeting = setHours(setMinutes(nextMeeting, minutes), hours);
+    
+    // If the next meeting is in the past, move to next week
     if (nextMeeting < now) {
-      nextMeeting = addDays(nextMeeting, 1);
+      nextMeeting = addWeeks(nextMeeting, 1);
     }
     
     return nextMeeting;

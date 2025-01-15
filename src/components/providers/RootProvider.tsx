@@ -1,9 +1,8 @@
 'use client';
 
-import { AuthProvider } from "@/lib/contexts/AuthContext";
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { Dashboard } from "@/components/dashboard/Dashboard";
-import { ErrorBoundary } from "@/components/error/ErrorBoundary";
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { AuthProvider } from '@/lib/contexts/AuthContext';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 interface RootProviderProps {
   children: React.ReactNode;
@@ -11,12 +10,12 @@ interface RootProviderProps {
 
 export function RootProvider({ children }: RootProviderProps) {
   return (
-    <AuthProvider>
-      <ErrorBoundary>
-        <ProtectedRoute>
-          <Dashboard>{children}</Dashboard>
-        </ProtectedRoute>
-      </ErrorBoundary>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <TooltipProvider>
+          {children}
+        </TooltipProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 } 
