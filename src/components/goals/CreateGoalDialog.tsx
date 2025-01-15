@@ -6,8 +6,9 @@ import { Fragment } from 'react';
 import { addMonths } from 'date-fns';
 import { Goal, TimeScale } from '@/types/models';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
-import { useGoalStore } from '@/lib/stores/useGoalStore';
+import useGoalStore from '@/lib/stores/useGoalStore';
 import { useUserStore } from '@/lib/stores/useUserStore';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import { getNextOccurrence } from '@/lib/utils/itineraryGeneration';
 import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon, ListTodo, StickyNote } from 'lucide-react';
 import { UserSelect } from '@/components/shared/UserSelect';
@@ -47,6 +48,7 @@ interface FormData {
 }
 
 export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProps) {
+  const { user } = useAuth();
   const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
@@ -63,7 +65,7 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || isSubmitting) return;
+    if (!formData.name || isSubmitting || !user?.householdId) return;
 
     setIsSubmitting(true);
 
@@ -77,8 +79,9 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
         targetDate: formData.targetDate,
         progress: 0,
         status: 'not_started',
-        createdBy: 'system',
-        updatedBy: 'system',
+        createdBy: user.uid,
+        updatedBy: user.uid,
+        householdId: user.householdId,
         successCriteria: formData.successCriteria.map(c => {
           const criteria: any = {
             text: c.text,

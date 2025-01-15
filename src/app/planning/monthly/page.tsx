@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useGoalStore } from '@/lib/stores/useGoalStore';
+import useGoalStore from '@/lib/stores/useGoalStore';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Button } from '@/components/ui/button';

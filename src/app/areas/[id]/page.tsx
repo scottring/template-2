@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase/firebase';
 import { Area, Goal, SuccessCriteria } from '@/types/models';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, PlusIcon, MoreVertical } from 'lucide-react';
-import { useGoalStore } from '@/lib/stores/useGoalStore';
+import useGoalStore from '@/lib/stores/useGoalStore';
 import { CreateGoalDialog } from '@/components/goals/CreateGoalDialog';
 import { EditGoalDialog } from '@/components/goals/EditGoalDialog';
 import { Menu, Transition } from '@headlessui/react';
@@ -18,7 +18,9 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const router = useRouter();
-  const { goals, setGoals, deleteGoal } = useGoalStore();
+  
+  const goals = useGoalStore(state => state.goals);
+  const deleteGoal = useGoalStore(state => state.deleteGoal);
   
   // Filter goals by areaId and ensure uniqueness by id
   const areaGoals = useMemo(() => {
@@ -45,22 +47,6 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
 
     return () => unsubscribe();
   }, [params.id, router]);
-
-  useEffect(() => {
-    const q = query(collection(db, 'goals'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const goals = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-        targetDate: doc.data().targetDate?.toDate(),
-      })) as Goal[];
-      setGoals(goals);
-    });
-
-    return () => unsubscribe();
-  }, [setGoals]);
 
   const handleDeleteGoal = async (goalId: string) => {
     if (window.confirm('Are you sure you want to delete this goal? This action cannot be undone.')) {

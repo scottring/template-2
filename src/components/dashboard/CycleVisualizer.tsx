@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { useGoalStore } from '@/lib/stores/useGoalStore';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
+import useGoalStore from '@/lib/stores/useGoalStore';
+import useTaskStore from '@/lib/stores/useTaskStore';
 
 const stages = [
   {

@@ -1,11 +1,11 @@
 'use client';
 
-import { useAreaStore } from '@/lib/stores/useAreaStore';
+import useAreaStore from '@/lib/stores/useAreaStore';
 import { PlusIcon, MoreVertical, Trash, Share2 } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CreateAreaDialog } from '@/components/areas/CreateAreaDialog';
 import { EditAreaDialog } from '@/components/areas/EditAreaDialog';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { Area } from '@/types/models';
 import { Menu, Transition } from '@headlessui/react';
@@ -13,41 +13,38 @@ import { Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { SharedIndicator } from '@/components/shared/SharedIndicator';
 import { ShareDialog } from '@/components/shared/ShareDialog';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function AreasPage() {
-  const { areas, setAreas, deleteArea } = useAreaStore();
+  const { user } = useAuth();
+  const areas = useAreaStore(state => state.areas);
+  const loading = useAreaStore(state => state.loading);
+  const error = useAreaStore(state => state.error);
+  const fetchAreas = useAreaStore(state => state.fetchAreas);
+  const deleteArea = useAreaStore(state => state.deleteArea);
+  const migrateAreas = useAreaStore(state => state.migrateAreas);
+  
+  const [sharingArea, setSharingArea] = useState<Area | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingArea, setEditingArea] = useState<Area | null>(null);
-  const [sharingArea, setSharingArea] = useState<Area | null>(null);
   const router = useRouter();
 
   useEffect(() => {
-    let isMounted = true;
-    const q = query(collection(db, 'areas'), orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!isMounted) return;
-      
-      const newAreas = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-      })) as Area[];
-      
-      // Only update if areas have actually changed
-      if (JSON.stringify(newAreas) !== JSON.stringify(areas)) {
-        setAreas(newAreas);
-      }
-    });
+    console.log('Auth state:', { user, householdId: user?.householdId });
+    if (user?.householdId) {
+      console.log('Fetching areas for household:', user.householdId);
+      fetchAreas(user.householdId)
+        .then(() => console.log('Areas fetched:', areas))
+        .catch(error => console.error('Error fetching areas:', error));
+    }
+  }, [fetchAreas, user?.householdId]);
 
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, [setAreas, areas]);
+  // Debug log when areas change
+  useEffect(() => {
+    console.log('Areas updated:', areas);
+  }, [areas]);
 
-  const handleDelete = async (areaId: string) => {
+  const handleDeleteArea = useCallback(async (areaId: string) => {
     if (window.confirm('Are you sure you want to delete this area? This action cannot be undone.')) {
       try {
         await deleteArea(areaId);
@@ -55,20 +52,54 @@ export default function AreasPage() {
         console.error('Error deleting area:', error);
       }
     }
-  };
+  }, [deleteArea]);
+
+  const handleMigrateAreas = useCallback(async () => {
+    if (!user?.householdId) return;
+    if (window.confirm('Are you sure you want to migrate all areas to your household? This action cannot be undone.')) {
+      try {
+        await migrateAreas(user.householdId);
+      } catch (error) {
+        console.error('Error migrating areas:', error);
+      }
+    }
+  }, [migrateAreas, user?.householdId]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-red-500">
+        Error loading areas: {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Life Areas</h1>
-        <button
-          type="button"
-          onClick={() => setIsCreateDialogOpen(true)}
-          className="inline-flex items-center gap-x-2 rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-        >
-          <PlusIcon className="-ml-0.5 h-5 w-5" aria-hidden="true" />
-          New Area
-        </button>
+        <h1 className="text-2xl font-semibold">Areas</h1>
+        <div className="flex gap-2">
+          <button
+            onClick={handleMigrateAreas}
+            className="inline-flex items-center gap-x-1.5 rounded-md bg-yellow-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-yellow-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-600"
+          >
+            Migrate Areas
+          </button>
+          <button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="inline-flex items-center gap-x-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          >
+            <PlusIcon className="-ml-0.5 h-5 w-5" aria-hidden="true" />
+            New Area
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -109,7 +140,7 @@ export default function AreasPage() {
                       <Menu.Item>
                         {({ active }) => (
                           <button
-                            onClick={() => handleDelete(area.id)}
+                            onClick={() => handleDeleteArea(area.id)}
                             className={`${
                               active ? 'bg-red-50 text-red-900' : 'text-red-700'
                             } block w-full px-4 py-2 text-left text-sm`}
@@ -189,18 +220,18 @@ export default function AreasPage() {
 
       {editingArea && (
         <EditAreaDialog
-          area={editingArea}
-          open={true}
+          open={!!editingArea}
           onClose={() => setEditingArea(null)}
+          area={editingArea}
         />
       )}
 
       {sharingArea && (
         <ShareDialog
-          open={true}
+          open={!!sharingArea}
           onClose={() => setSharingArea(null)}
-          itemType="areas"
           itemId={sharingArea.id}
+          itemType="area"
           itemName={sharingArea.name}
         />
       )}

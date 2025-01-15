@@ -3,9 +3,10 @@
 import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X as XMarkIcon } from 'lucide-react';
-import { useAreaStore } from '@/lib/stores/useAreaStore';
+import useAreaStore from '@/lib/stores/useAreaStore';
 import { useUserStore } from '@/lib/stores/useUserStore';
 import { UserSelect } from '@/components/shared/UserSelect';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 interface CreateAreaDialogProps {
   open: boolean;
@@ -14,6 +15,7 @@ interface CreateAreaDialogProps {
 
 export function CreateAreaDialog({ open, onClose }: CreateAreaDialogProps) {
   const addArea = useAreaStore((state) => state.addArea);
+  const { user } = useAuth();
   const [formData, setFormData] = useState<{
     name: string;
     description: string;
@@ -31,10 +33,17 @@ export function CreateAreaDialog({ open, onClose }: CreateAreaDialogProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.householdId) return;
+    
     setIsSubmitting(true);
 
     try {
-      await addArea(formData);
+      await addArea({
+        ...formData,
+        householdId: user.householdId,
+        color: '#4F46E5', // Default color
+        icon: 'home', // Default icon
+      });
       onClose();
       setFormData({
         name: '',
@@ -135,12 +144,10 @@ export function CreateAreaDialog({ open, onClose }: CreateAreaDialogProps) {
                             <UserSelect
                               users={useUserStore.getState().users}
                               selectedUserIds={formData.assignedTo}
-                              onSelect={(userId) => {
+                              onSelect={(userIds: string[]) => {
                                 setFormData((prev) => ({
                                   ...prev,
-                                  assignedTo: prev.assignedTo.includes(userId)
-                                    ? prev.assignedTo.filter((id) => id !== userId)
-                                    : [...prev.assignedTo, userId]
+                                  assignedTo: userIds
                                 }));
                               }}
                             />

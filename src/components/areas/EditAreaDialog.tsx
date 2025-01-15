@@ -3,7 +3,7 @@
 import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X as XMarkIcon } from 'lucide-react';
-import { useAreaStore } from '@/lib/stores/useAreaStore';
+import useAreaStore from '@/lib/stores/useAreaStore';
 import { Area } from '@/types/models';
 
 interface EditAreaDialogProps {
@@ -15,22 +15,20 @@ interface EditAreaDialogProps {
 export function EditAreaDialog({ area, open, onClose }: EditAreaDialogProps) {
   const updateArea = useAreaStore((state) => state.updateArea);
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    isActive: true,
-    isFocus: false,
+    name: area.name || '',
+    description: area.description || '',
+    isActive: area.isActive ?? true,
+    isFocus: area.isFocus ?? false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (area) {
-      setFormData({
-        name: area.name,
-        description: area.description,
-        isActive: area.isActive,
-        isFocus: area.isFocus,
-      });
-    }
+    setFormData({
+      name: area.name || '',
+      description: area.description || '',
+      isActive: area.isActive ?? true,
+      isFocus: area.isFocus ?? false,
+    });
   }, [area]);
 
   const handleSubmit = async (e: React.FormEvent) => {

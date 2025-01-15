@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
-import { TaskCategory } from '@/types/models';
+import useTaskStore from '@/lib/stores/useTaskStore';
+import { Task, TaskCategory } from '@/types/models';
 
 export function TaskCategories() {
-  const { tasks } = useTaskStore();
+  const tasks = useTaskStore((state: { tasks: Task[] }) => state.tasks);
 
   const categories = useMemo(() => {
     const categoryStats = tasks.reduce((acc, task) => {

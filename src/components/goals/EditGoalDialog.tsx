@@ -3,12 +3,12 @@
 import { Fragment, useState, useEffect } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon, ListTodo, StickyNote } from 'lucide-react';
-import { useGoalStore } from '@/lib/stores/useGoalStore';
+import useGoalStore from '@/lib/stores/useGoalStore';
 import { useUserStore } from '@/lib/stores/useUserStore';
 import { UserSelect } from '@/components/shared/UserSelect';
 import { Goal, SuccessCriteria } from '@/types/models';
 import { getNextOccurrence } from '@/lib/utils/itineraryGeneration';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
+import useTaskStore from '@/lib/stores/useTaskStore';
 import { useAuth } from '@/lib/hooks/useAuth';
 
 interface EditGoalDialogProps {

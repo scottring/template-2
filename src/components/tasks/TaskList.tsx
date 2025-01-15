@@ -5,9 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
+import useTaskStore from '@/lib/stores/useTaskStore';
 import { useHouseholdStore } from '@/lib/stores/useHouseholdStore';
-import { Task, TaskCategory } from '@/types/models';
+import { Task, TaskCategory, HouseholdMember } from '@/types/models';
 import { format } from 'date-fns';
 import { Check, Clock, Filter, Plus, Search, SortAsc } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -26,8 +26,9 @@ export function TaskList({ onCreateTask, onEditTask }: TaskListProps) {
   });
   const [sortBy, setSortBy] = useState<'dueDate' | 'priority'>('dueDate');
 
-  const { tasks, completeTask } = useTaskStore();
-  const { members } = useHouseholdStore();
+  const tasks = useTaskStore((state: { tasks: Task[] }) => state.tasks);
+  const completeTask = useTaskStore((state: { completeTask: (taskId: string, userId: string) => Promise<void> }) => state.completeTask);
+  const members = useHouseholdStore((state: { members: HouseholdMember[] }) => state.members);
   const { user } = useAuth();
 
   const filteredTasks = useMemo(() => {
