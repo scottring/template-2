@@ -2,8 +2,8 @@
 
 import { cn } from "@/lib/utils";
 import Link, { LinkProps } from "next/link";
-import React from "react";
-import { Menu, LogOut } from "lucide-react";
+import React, { useState } from "react";
+import { Menu, LogOut, X } from "lucide-react";
 import { useAuth } from "@/lib/contexts/AuthContext";
 
 interface Links {
@@ -17,61 +17,61 @@ export const Sidebar = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const SidebarBody = ({ children }: { children: React.ReactNode }) => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   return (
     <>
-      <DesktopSidebar>{children}</DesktopSidebar>
-      <MobileSidebar>{children}</MobileSidebar>
+      {/* Desktop sidebar */}
+      <div className="hidden md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800 w-[300px] h-full px-4 py-4 flex-shrink-0">
+        <h2 className="text-xl font-semibold mb-4 px-4">FamilyGoals</h2>
+        <div className="flex-1">
+          {children}
+        </div>
+        <UserProfile />
+      </div>
+
+      {/* Mobile menu button */}
+      <div className="fixed top-4 right-4 md:hidden">
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 rounded-md text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+        >
+          <Menu className="h-6 w-6" />
+        </button>
+      </div>
+
+      {/* Mobile sidebar */}
+      <div
+        className={`${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        } transform fixed inset-0 z-50 md:hidden transition-transform duration-300 ease-in-out`}
+      >
+        <div className="relative h-full">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black bg-opacity-50"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+
+          {/* Sidebar content */}
+          <div className="relative h-full w-[300px] bg-neutral-100 dark:bg-neutral-800 px-4 py-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold px-4">FamilyGoals</h2>
+              <button
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="p-2 rounded-md text-neutral-800 dark:text-neutral-200 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="flex-1">
+              {children}
+            </div>
+            <UserProfile />
+          </div>
+        </div>
+      </div>
     </>
-  );
-};
-
-export const DesktopSidebar = ({
-  className,
-  children,
-  ...props
-}: {
-  children: React.ReactNode;
-} & React.ComponentProps<"div">) => {
-  return (
-    <div
-      className={cn(
-        "h-full px-4 py-4 hidden md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800 w-[300px] flex-shrink-0",
-        className
-      )}
-      style={{
-        width: "300px",
-      }}
-      {...props}
-    >
-      <h2 className="text-xl font-semibold mb-4 px-4">FamilyGoals</h2>
-      <div className="flex-1">
-        {children}
-      </div>
-      <UserProfile />
-    </div>
-  );
-};
-
-export const MobileSidebar = ({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<"div">) => {
-  return (
-    <div
-      className={cn(
-        "h-full px-4 py-4 md:hidden flex flex-col bg-neutral-100 dark:bg-neutral-800 w-full"
-      )}
-      {...props}
-    >
-      <div className="flex justify-end mb-4">
-        <Menu className="text-neutral-800 dark:text-neutral-200" />
-      </div>
-      <div className="flex-1">
-        {children}
-      </div>
-      <UserProfile />
-    </div>
   );
 };
 

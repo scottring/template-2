@@ -210,7 +210,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                                 name="startDate"
                                 id="startDate"
                                 required
-                                value={formData.startDate?.toISOString().split('T')[0] || ''}
+                                value={formData.startDate ? formData.startDate.toISOString().split('T')[0] : ''}
                                 onChange={(e) => setFormData((prev) => ({ ...prev, startDate: new Date(e.target.value) }))}
                                 className="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
                               />
@@ -350,4 +350,4 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
       </Dialog>
     </Transition.Root>
   );
-} 
+}
