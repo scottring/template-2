@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
-import { useGoalStore } from '@/lib/stores/useGoalStore';
-import type { ItineraryItem, TimeScale, ItineraryType } from '@/types/models';
+import useGoalStore from '@/lib/stores/useGoalStore';
+import type { ItineraryItem, TimeScale } from '@/types/models';
 import { format } from 'date-fns';
 
 interface ItineraryViewProps {
   date: Date;
-  type: ItineraryType;
+  type: 'planning' | 'review';
   timeScale: TimeScale;
 }
 
@@ -45,9 +45,7 @@ export function ItineraryView({ date, type, timeScale }: ItineraryViewProps) {
   };
 
   const handleItemClick = (item: ItineraryItem) => {
-    if (item.parentId) {
-      router.push(`/itinerary/${item.parentId}`);
-    }
+    router.push(`/itinerary/${item.referenceId}`);
   };
 
   return (
@@ -69,11 +67,6 @@ export function ItineraryView({ date, type, timeScale }: ItineraryViewProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <span className="text-gray-900">{item.type}</span>
-                {item.goalId && goalMap[item.goalId] && (
-                  <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
-                    {goalMap[item.goalId]}
-                  </span>
-                )}
                 <span className="text-gray-500">{item.notes}</span>
               </div>
               <select
@@ -84,7 +77,6 @@ export function ItineraryView({ date, type, timeScale }: ItineraryViewProps) {
               >
                 <option value="pending">Pending</option>
                 <option value="completed">Completed</option>
-                <option value="deferred">Deferred</option>
                 <option value="cancelled">Cancelled</option>
               </select>
             </div>

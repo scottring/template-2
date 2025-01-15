@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
+import useTaskStore from '@/lib/stores/useTaskStore';
 import { Task } from '@/types/models';
 import { format, isToday, isTomorrow, isThisWeek, isPast } from 'date-fns';
 import { CheckCircle2, Clock, ListTodo, AlertTriangle } from 'lucide-react';
 
 export function TaskStats() {
-  const { tasks } = useTaskStore();
+  const tasks = useTaskStore(state => state.tasks);
 
   const stats = useMemo(() => {
     const total = tasks.length;

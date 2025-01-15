@@ -2,60 +2,72 @@
 
 import { format, addDays } from 'date-fns';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
-import { useGoalStore } from '@/lib/stores/useGoalStore';
-import { Goal, ItineraryItem } from '@/types/models';
+import useGoalStore from '@/lib/stores/useGoalStore';
+import { Goal, ItineraryItem, TimeScale } from '@/types/models';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { ArrowUpRight } from 'lucide-react';
+import { useAuth } from '@/lib/hooks/useAuth';
 
-interface HabitWithContext {
-  id: string;
-  name: string;
-  description: string;
-  referenceId: string;
-  frequency: {
-    type: 'daily' | 'weekly' | 'monthly';
-    value: number;
-  };
+interface HabitWithContext extends ItineraryItem {
+  goal?: Goal;
+  streak: number;
   progress: {
     completed: number;
     total: number;
     lastUpdatedAt: Date;
   };
-  streak: number;
-  assignedTo: string[];
-  createdAt: Date;
-  updatedAt: Date;
-  goal?: Goal;
+  frequency: {
+    type: TimeScale;
+    value: number;
+  };
 }
 
 export function ActiveHabits() {
   const router = useRouter();
-  const { getActiveHabits } = useItineraryStore();
-  const { goals, loadGoals } = useGoalStore();
+  const { user } = useAuth();
+  const { getActiveHabits, getStreak } = useItineraryStore();
+  const { goals, fetchGoals } = useGoalStore();
   const habits = getActiveHabits();
 
   // Load goals on component mount
   useEffect(() => {
+    const householdId = user?.householdId;
+    if (!householdId) return;
+
     const loadGoalsData = async () => {
       try {
-        await loadGoals();
+        await fetchGoals(householdId);
         console.log('Goals loaded:', goals.map(g => ({ id: g.id, name: g.name })));
       } catch (error) {
         console.error('Error loading goals:', error);
       }
     };
     loadGoalsData();
-  }, []); // Only run on mount
+  }, [fetchGoals, user?.householdId]);
 
   // Add goal context to each habit
-  const habitsWithContext = habits.map(habit => {
+  const habitsWithContext: HabitWithContext[] = habits.map(habit => {
     console.log('Processing habit:', { id: habit.id, referenceId: habit.referenceId });
     const goal = goals.find((g: Goal) => g.id === habit.referenceId);
     if (!goal) {
       console.log('No goal found for referenceId:', habit.referenceId);
     }
-    return { ...habit, goal };
+    return {
+      ...habit,
+      goal,
+      streak: getStreak(habit.id),
+      progress: {
+        completed: 0, // TODO: Calculate from schedule/history
+        total: habit.schedule.repeat === 'daily' ? 1 : 
+               habit.schedule.repeat === 'weekly' ? 7 : 30,
+        lastUpdatedAt: habit.updatedAt
+      },
+      frequency: {
+        type: habit.schedule.repeat || 'weekly',
+        value: 1
+      }
+    };
   });
 
   const handleHabitClick = (habit: HabitWithContext) => {
@@ -90,7 +102,7 @@ export function ActiveHabits() {
             )}
 
             <div className="flex items-center gap-2">
-              <span className="font-medium">{habit.name}</span>
+              <span className="font-medium">{habit.notes}</span>
               <span className="text-sm text-orange-500">
                 🔥 {habit.streak} day streak
               </span>

@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { query, collection, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
-import { Goal, Project } from '@/types/models';
+import { Goal, Project, SuccessCriteria } from '@/types/models';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, PlusIcon, MoreVertical, Calendar, Target, Share2, Trash2 } from 'lucide-react';
-import { useGoalStore } from '@/lib/stores/useGoalStore';
+import useGoalStore from '@/lib/stores/useGoalStore';
 import { useProjectStore } from '@/lib/stores/useProjectStore';
 import { Menu, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
@@ -22,16 +22,10 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
   const [isCreateProjectDialogOpen, setIsCreateProjectDialogOpen] = useState(false);
   const [sharingGoal, setSharingGoal] = useState<Goal | null>(null);
   const router = useRouter();
-  const { goals, deleteGoal, subscribeToGoals } = useGoalStore();
+  const { goals, deleteGoal } = useGoalStore();
   const { projects, setProjects } = useProjectStore();
-  const goal = goals.find(g => g.id === params.id);
+  const goal = goals.find((g: Goal) => g.id === params.id);
   const goalProjects: Project[] = projects.filter((project) => project.goalId === params.id);
-
-  useEffect(() => {
-    const unsubscribe = subscribeToGoals();
-    setLoading(false);
-    return () => unsubscribe();
-  }, [subscribeToGoals]);
 
   useEffect(() => {
     if (!loading && !goal) {
@@ -165,7 +159,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
             <div className="p-6">
               <h2 className="text-base font-semibold">Success Criteria</h2>
               <ul className="mt-2 space-y-2">
-                {goal.successCriteria.map((criteria, index) => (
+                {goal.successCriteria.map((criteria: SuccessCriteria, index: number) => (
                   <li key={index} className="flex items-start gap-x-3 text-sm">
                     <div className="relative mt-1 flex h-5 w-5 items-center justify-center">
                       <div className="h-4 w-4 rounded-full border-2" />

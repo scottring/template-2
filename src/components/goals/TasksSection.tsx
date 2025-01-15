@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { PlusIcon, Share2 } from 'lucide-react';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
-import { useGoalStore } from '@/lib/stores/useGoalStore';
+import useTaskStore from '@/lib/stores/useTaskStore';
+import useGoalStore from '@/lib/stores/useGoalStore';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog';
 import { SharedIndicator } from '@/components/shared/SharedIndicator';

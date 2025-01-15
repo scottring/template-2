@@ -3,15 +3,10 @@ export type TimeScale = 'daily' | 'weekly' | 'monthly' | 'yearly';
 export interface Schedule {
   startDate: Date;
   endDate?: Date;
-  recurrence?: {
-    frequency: number;
-    interval: TimeScale;
-  };
-  schedules?: {
-    repeat: {
-      days: number[];
-      times: string[];
-    };
+  repeat?: TimeScale;
+  schedules: {
+    day: number;
+    time: string;
   }[];
 }
 
@@ -96,6 +91,9 @@ export interface Area extends BaseItem {
   icon: string;
   parentId?: string;
   householdId: string;
+  isFocus?: boolean;
+  isActive?: boolean;
+  assignedTo: string[];
 }
 
 export interface SuccessCriteria {
@@ -137,3 +135,14 @@ export interface ItineraryItem extends BaseItem {
 }
 
 export type TaskCategory = 'chore' | 'errand' | 'maintenance' | 'kids' | 'meal' | 'shopping' | 'finance' | 'health' | 'social' | 'other';
+
+export interface Project extends BaseItem {
+  name: string;
+  description: string;
+  goalId: string;
+  progress: number;
+  startDate?: Date;
+  endDate?: Date;
+  assignedTo: string[];
+  householdId: string;
+}

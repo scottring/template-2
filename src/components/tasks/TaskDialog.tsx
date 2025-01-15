@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,110 +8,86 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/components/ui/use-toast';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { CalendarIcon } from 'lucide-react';
+import { Task, TaskCategory } from '@/types/models';
+import useTaskStore from '@/lib/stores/useTaskStore';
 import { useHouseholdStore } from '@/lib/stores/useHouseholdStore';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { Task, TaskCategory, RecurrencePattern, TimeScale } from '@/types/models';
-import { format } from 'date-fns';
-import { CalendarIcon, Users } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 interface TaskDialogProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
   task?: Task;
 }
 
-export function TaskDialog({ open, onOpenChange, task }: TaskDialogProps) {
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    category: 'chore' as TaskCategory,
-    priority: 'medium' as Task['priority'],
-    dueDate: undefined as Date | undefined,
-    assignedTo: [] as string[],
-    isRecurring: false,
-    recurrence: {
-      frequency: 1,
-      interval: 'weekly' as TimeScale,
-      daysOfWeek: [] as number[],
-    },
-  });
+export function TaskDialog({ open, onClose, task }: TaskDialogProps) {
+  const [title, setTitle] = useState(task?.title || '');
+  const [description, setDescription] = useState(task?.description || '');
+  const [category, setCategory] = useState<TaskCategory>(task?.category || 'other');
+  const [priority, setPriority] = useState<Task['priority']>(task?.priority || 'medium');
+  const [dueDate, setDueDate] = useState<Date | undefined>(task?.dueDate ? new Date(task.dueDate) : undefined);
+  const [assignedTo, setAssignedTo] = useState<string[]>(task?.assignedTo || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { createTask, updateTask, createRecurringTask } = useTaskStore();
-  const { members } = useHouseholdStore();
+  const addTask = useTaskStore(state => state.addTask);
+  const updateTask = useTaskStore(state => state.updateTask);
+  const members = useHouseholdStore(state => state.members);
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     if (task) {
-      setFormData({
-        title: task.title,
-        description: task.description || '',
-        category: task.category,
-        priority: task.priority,
-        dueDate: task.dueDate,
-        assignedTo: task.assignedTo,
-        isRecurring: !!task.recurrence,
-        recurrence: task.recurrence ? {
-          frequency: task.recurrence.frequency,
-          interval: task.recurrence.interval,
-          daysOfWeek: task.recurrence.daysOfWeek || [],
-        } : {
-          frequency: 1,
-          interval: 'weekly',
-          daysOfWeek: [],
-        },
-      });
+      setTitle(task.title || '');
+      setDescription(task.description || '');
+      setCategory(task.category);
+      setPriority(task.priority);
+      setDueDate(task.dueDate ? new Date(task.dueDate) : undefined);
+      setAssignedTo(task.assignedTo || []);
     }
   }, [task]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-    
+    if (!user?.householdId) return;
+
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
-      
       const taskData = {
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        priority: formData.priority,
-        dueDate: formData.dueDate,
-        assignedTo: formData.assignedTo,
+        title: title.trim(),
+        description: description.trim(),
+        category,
+        priority,
+        dueDate,
+        assignedTo,
+        householdId: user.householdId,
+        createdBy: user.uid,
+        updatedBy: user.uid,
         status: 'pending' as const,
-        tags: [] as string[],
       };
 
       if (task) {
         await updateTask(task.id, taskData);
         toast({
-          title: 'Task updated',
-          description: 'The task has been updated successfully.',
-        });
-      } else if (formData.isRecurring) {
-        await createRecurringTask(taskData, formData.recurrence);
-        toast({
-          title: 'Recurring task created',
-          description: 'The recurring task has been created successfully.',
+          title: "Task updated",
+          description: "Your task has been updated successfully.",
         });
       } else {
-        await createTask(taskData);
+        await addTask(taskData);
         toast({
-          title: 'Task created',
-          description: 'The task has been created successfully.',
+          title: "Task created",
+          description: "Your task has been created successfully.",
         });
       }
-      
-      onOpenChange(false);
+      onClose();
     } catch (error) {
       console.error('Error saving task:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to save task. Please try again.',
-        variant: 'destructive',
+        title: "Error",
+        description: "There was an error saving your task. Please try again.",
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -119,12 +95,12 @@ export function TaskDialog({ open, onOpenChange, task }: TaskDialogProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{task ? 'Edit Task' : 'Create Task'}</DialogTitle>
           <DialogDescription>
-            {task ? 'Update task details and assignments.' : 'Add a new task to your household.'}
+            {task ? 'Update your task details below.' : 'Add a new task to your list.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -133,10 +109,9 @@ export function TaskDialog({ open, onOpenChange, task }: TaskDialogProps) {
               <Label htmlFor="title">Title</Label>
               <Input
                 id="title"
-                value={formData.title}
-                onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Enter task title"
-                required
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Enter task title..."
               />
             </div>
 
@@ -144,9 +119,9 @@ export function TaskDialog({ open, onOpenChange, task }: TaskDialogProps) {
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
-                value={formData.description}
-                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Enter task description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Enter task description..."
                 rows={3}
               />
             </div>
@@ -155,10 +130,8 @@ export function TaskDialog({ open, onOpenChange, task }: TaskDialogProps) {
               <div className="grid gap-2">
                 <Label>Category</Label>
                 <Select
-                  value={formData.category}
-                  onValueChange={(value: TaskCategory) => 
-                    setFormData(prev => ({ ...prev, category: value }))
-                  }
+                  value={category}
+                  onValueChange={(value: TaskCategory) => setCategory(value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -181,10 +154,8 @@ export function TaskDialog({ open, onOpenChange, task }: TaskDialogProps) {
               <div className="grid gap-2">
                 <Label>Priority</Label>
                 <Select
-                  value={formData.priority}
-                  onValueChange={(value: Task['priority']) => 
-                    setFormData(prev => ({ ...prev, priority: value }))
-                  }
+                  value={priority}
+                  onValueChange={(value: Task['priority']) => setPriority(value)}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -204,17 +175,17 @@ export function TaskDialog({ open, onOpenChange, task }: TaskDialogProps) {
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className={!formData.dueDate ? 'text-muted-foreground' : ''}
+                    className={!dueDate ? 'text-muted-foreground' : ''}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.dueDate ? format(formData.dueDate, 'PPP') : 'Pick a date'}
+                    {dueDate ? format(dueDate, 'PPP') : 'Pick a date'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
-                    selected={formData.dueDate}
-                    onSelect={(date) => setFormData(prev => ({ ...prev, dueDate: date || undefined }))}
+                    selected={dueDate}
+                    onSelect={(date) => setDueDate(date || undefined)}
                     initialFocus
                   />
                 </PopoverContent>
@@ -224,10 +195,8 @@ export function TaskDialog({ open, onOpenChange, task }: TaskDialogProps) {
             <div className="grid gap-2">
               <Label>Assigned To</Label>
               <Select
-                value={formData.assignedTo[0] || ''}
-                onValueChange={(value) => 
-                  setFormData(prev => ({ ...prev, assignedTo: [value] }))
-                }
+                value={assignedTo[0] || ''}
+                onValueChange={(value) => setAssignedTo([value])}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Assign to member" />
@@ -241,77 +210,17 @@ export function TaskDialog({ open, onOpenChange, task }: TaskDialogProps) {
                 </SelectContent>
               </Select>
             </div>
-
-            {!task && (
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="recurring"
-                  checked={formData.isRecurring}
-                  onCheckedChange={(checked) => 
-                    setFormData(prev => ({ ...prev, isRecurring: checked }))
-                  }
-                />
-                <Label htmlFor="recurring">Make this a recurring task</Label>
-              </div>
-            )}
-
-            {formData.isRecurring && !task && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label>Frequency</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      min={1}
-                      value={formData.recurrence.frequency}
-                      onChange={(e) => 
-                        setFormData(prev => ({
-                          ...prev,
-                          recurrence: {
-                            ...prev.recurrence,
-                            frequency: parseInt(e.target.value) || 1,
-                          },
-                        }))
-                      }
-                      className="w-20"
-                    />
-                    <Select
-                      value={formData.recurrence.interval}
-                      onValueChange={(value: TimeScale) => 
-                        setFormData(prev => ({
-                          ...prev,
-                          recurrence: {
-                            ...prev.recurrence,
-                            interval: value,
-                          },
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Days</SelectItem>
-                        <SelectItem value="weekly">Weeks</SelectItem>
-                        <SelectItem value="monthly">Months</SelectItem>
-                        <SelectItem value="yearly">Years</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => onClose()}
               disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || !formData.title.trim()}>
+            <Button type="submit" disabled={isSubmitting || !title.trim()}>
               {isSubmitting ? 'Saving...' : task ? 'Update Task' : 'Create Task'}
             </Button>
           </DialogFooter>
