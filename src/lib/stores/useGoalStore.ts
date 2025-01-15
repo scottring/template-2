@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { Goal } from '@/types/models';
-import { collection, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
 interface GoalStore {
   goals: Goal[];
   setGoals: (goals: Goal[]) => void;
+  loadGoals: () => Promise<void>;
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateGoal: (goalId: string, updates: Partial<Goal>) => Promise<void>;
   deleteGoal: (goalId: string) => Promise<void>;
@@ -14,10 +15,29 @@ interface GoalStore {
 export const useGoalStore = create<GoalStore>((set) => ({
   goals: [],
   setGoals: (goals) => set({ goals }),
+  loadGoals: async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'goals'));
+      const goals = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Goal));
+      set({ goals });
+    } catch (error) {
+      console.error('Error loading goals:', error);
+      throw error;
+    }
+  },
   addGoal: async (goalData) => {
     try {
+      // Clean up successCriteria by removing undefined values
+      const cleanedSuccessCriteria = goalData.successCriteria.map(criteria => ({
+        text: criteria.text || '',
+        isTracked: criteria.isTracked || false,
+        ...(criteria.timescale && { timescale: criteria.timescale }),
+        ...(criteria.nextOccurrence && { nextOccurrence: criteria.nextOccurrence })
+      }));
+
       const newGoal: Omit<Goal, 'id'> = {
         ...goalData,
+        successCriteria: cleanedSuccessCriteria,
         progress: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -59,4 +79,4 @@ export const useGoalStore = create<GoalStore>((set) => ({
       throw error;
     }
   },
-})); 
+}));

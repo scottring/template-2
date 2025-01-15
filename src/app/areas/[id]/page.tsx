@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { doc, onSnapshot, query, collection, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
-import { Area, Goal } from '@/types/models';
+import { Area, Goal, SuccessCriteria } from '@/types/models';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, PlusIcon, MoreVertical } from 'lucide-react';
 import { useGoalStore } from '@/lib/stores/useGoalStore';
@@ -19,7 +19,14 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
   const router = useRouter();
   const { goals, setGoals, deleteGoal } = useGoalStore();
-  const areaGoals = goals.filter((goal) => goal.areaId === params.id);
+  
+  // Filter goals by areaId and ensure uniqueness by id
+  const areaGoals = useMemo(() => {
+    const uniqueGoals = new Map();
+    goals.filter(goal => goal.areaId === params.id)
+         .forEach(goal => uniqueGoals.set(goal.id, goal));
+    return Array.from(uniqueGoals.values());
+  }, [goals, params.id]);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'areas', params.id), (doc) => {
@@ -111,49 +118,53 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
           >
             <div className="absolute right-4 top-4">
               <Menu as="div" className="relative inline-block text-left">
-                <Menu.Button className="flex items-center rounded-full bg-white text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                  <span className="sr-only">Open options</span>
-                  <MoreVertical className="h-5 w-5" aria-hidden="true" />
-                </Menu.Button>
-                <Transition
-                  as={Fragment}
-                  show={true}
-                  enter="transition ease-out duration-100"
-                  enterFrom="transform opacity-0 scale-95"
-                  enterTo="transform opacity-100 scale-100"
-                  leave="transition ease-in duration-75"
-                  leaveFrom="transform opacity-100 scale-100"
-                  leaveTo="transform opacity-0 scale-95"
-                >
-                  <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                    <div className="py-1">
-                      <Menu.Item>
-                        {({ active }) => (
-                          <button
-                            onClick={() => setEditingGoal(goal)}
-                            className={`${
-                              active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
-                            } block w-full px-4 py-2 text-left text-sm`}
-                          >
-                            Edit
-                          </button>
-                        )}
-                      </Menu.Item>
-                      <Menu.Item>
-                        {({ active }) => (
-                          <button
-                            onClick={() => handleDeleteGoal(goal.id)}
-                            className={`${
-                              active ? 'bg-red-50 text-red-900' : 'text-red-700'
-                            } block w-full px-4 py-2 text-left text-sm`}
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </Menu.Item>
-                    </div>
-                  </Menu.Items>
-                </Transition>
+                {({ open }) => (
+                  <>
+                    <Menu.Button className="flex items-center rounded-full bg-white text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                      <span className="sr-only">Open options</span>
+                      <MoreVertical className="h-5 w-5" aria-hidden="true" />
+                    </Menu.Button>
+                    <Transition
+                      as={Fragment}
+                      show={open}
+                      enter="transition ease-out duration-100"
+                      enterFrom="transform opacity-0 scale-95"
+                      enterTo="transform opacity-100 scale-100"
+                      leave="transition ease-in duration-75"
+                      leaveFrom="transform opacity-100 scale-100"
+                      leaveTo="transform opacity-0 scale-95"
+                    >
+                      <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                        <div className="py-1">
+                          <Menu.Item>
+                            {({ active }) => (
+                              <button
+                                onClick={() => setEditingGoal(goal)}
+                                className={`${
+                                  active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
+                                } block w-full px-4 py-2 text-left text-sm`}
+                              >
+                                Edit
+                              </button>
+                            )}
+                          </Menu.Item>
+                          <Menu.Item>
+                            {({ active }) => (
+                              <button
+                                onClick={() => handleDeleteGoal(goal.id)}
+                                className={`${
+                                  active ? 'bg-red-50 text-red-900' : 'text-red-700'
+                                } block w-full px-4 py-2 text-left text-sm`}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </Menu.Item>
+                        </div>
+                      </Menu.Items>
+                    </Transition>
+                  </>
+                )}
               </Menu>
             </div>
             <div className="p-6">
@@ -175,8 +186,8 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
               <div className="mt-4">
                 <h4 className="text-sm font-medium text-gray-900">Success Criteria:</h4>
                 <ul className="mt-2 space-y-1">
-                  {goal.successCriteria.map((criteria, index) => (
-                    <li key={index} className="text-sm text-gray-500">
+                  {goal.successCriteria.map((criteria: SuccessCriteria, index: number) => (
+                    <li key={`${goal.id}-${criteria.text}-${index}`} className="text-sm text-gray-500">
                       • {criteria.text}
                     </li>
                   ))}
@@ -230,4 +241,4 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
       )}
     </div>
   );
-} 
+}
