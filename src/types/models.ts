@@ -1,4 +1,4 @@
-export type TimeScale = 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type TimeScale = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 export interface Schedule {
   startDate: Date;
@@ -128,10 +128,8 @@ export interface ItineraryItem extends BaseItem {
   referenceId: string;
   criteriaId?: string;
   schedule: Schedule;
-  status: 'pending' | 'completed' | 'cancelled';
-  notes?: string;
-  timescale?: TimeScale;
-  dueDate?: Date;
+  status: 'pending' | 'completed' | 'cancelled' | 'ongoing';
+  notes: string;
 }
 
 export type TaskCategory = 'chore' | 'errand' | 'maintenance' | 'kids' | 'meal' | 'shopping' | 'finance' | 'health' | 'social' | 'other';
