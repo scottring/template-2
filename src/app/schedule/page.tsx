@@ -48,16 +48,23 @@ export default function QuickSchedulePage() {
   const handleSchedule = (config: ScheduleConfig) => {
     if (!selectedCriteria || !user) return;
 
+    // Create schedule object without undefined values
+    const schedule: any = {
+      startDate: new Date(),
+      schedules: config.schedules,
+    };
+
+    // Only add repeat and endDate if they have values
+    if (config.repeat !== 'none') {
+      schedule.repeat = config.repeat;
+      schedule.endDate = config.endDate;
+    }
+
     addItem({
       type: 'task',
       referenceId: selectedCriteria.goalId,
       criteriaId: selectedCriteria.criteria.id,
-      schedule: {
-        startDate: new Date(),
-        schedules: config.schedules,
-        repeat: config.repeat === 'none' ? undefined : config.repeat,
-        endDate: config.endDate
-      },
+      schedule,
       status: 'pending',
       notes: selectedCriteria.criteria.text,
       createdBy: user.uid,

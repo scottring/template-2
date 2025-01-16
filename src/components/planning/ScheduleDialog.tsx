@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -25,6 +25,11 @@ interface ScheduleDialogProps {
   onSchedule: (config: ScheduleConfig) => void;
   itemName: string;
   targetDate?: Date;
+  initialSchedule?: {
+    schedules: Array<{ day: number; time: string }>;
+    repeat?: TimeScale;
+    endDate?: Date;
+  };
 }
 
 const WEEKDAYS = [
@@ -42,11 +47,31 @@ const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {
   return `${hour}:00`;
 });
 
-export function ScheduleDialog({ open, onClose, onSchedule, itemName, targetDate }: ScheduleDialogProps) {
+export function ScheduleDialog({ open, onClose, onSchedule, itemName, targetDate, initialSchedule }: ScheduleDialogProps) {
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [dayTimes, setDayTimes] = useState<Record<number, string>>({});
   const [repeat, setRepeat] = useState<TimeScale | 'none'>('weekly');
   const [endDate, setEndDate] = useState<Date | undefined>(targetDate);
+
+  // Initialize with existing schedule when dialog opens
+  useEffect(() => {
+    if (open && initialSchedule) {
+      const days = initialSchedule.schedules.map(s => s.day);
+      const times = Object.fromEntries(
+        initialSchedule.schedules.map(s => [s.day, s.time])
+      );
+      setSelectedDays(days);
+      setDayTimes(times);
+      setRepeat(initialSchedule.repeat || 'none');
+      setEndDate(initialSchedule.endDate || targetDate);
+    } else if (open) {
+      // Reset when opening without initial schedule
+      setSelectedDays([]);
+      setDayTimes({});
+      setRepeat('weekly');
+      setEndDate(targetDate);
+    }
+  }, [open, initialSchedule, targetDate]);
 
   const handleDayToggle = (dayIndex: number) => {
     setSelectedDays((prev) => {

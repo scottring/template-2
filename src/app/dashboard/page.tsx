@@ -5,12 +5,19 @@ import { QuickAddButton } from "@/components/planning/QuickAddButton";
 import useItineraryStore from "@/lib/stores/useItineraryStore";
 import useGoalStore from "@/lib/stores/useGoalStore";
 import { UnscheduledTasks } from "@/components/dashboard/UnscheduledTasks";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { CalendarIcon, Trash2 } from "lucide-react";
+import { ScheduleDialog } from "@/components/planning/ScheduleDialog";
+import { useAuth } from "@/lib/hooks/useAuth";
 
 export default function DashboardPage() {
-  const { items: allItems } = useItineraryStore();
+  const { items: allItems, updateItem, deleteItem } = useItineraryStore();
   const { goals: activeGoals } = useGoalStore();
+  const { user } = useAuth();
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
 
   // Filter items that are scheduled for today based on their recurrence pattern
   const todayItems = useMemo(() => {
@@ -29,6 +36,35 @@ export default function DashboardPage() {
     });
   }, [allItems]);
 
+  const handleReschedule = (config: any) => {
+    if (!selectedItem || !user) return;
+
+    // Create schedule object without undefined values
+    const schedule: any = {
+      startDate: new Date(),
+      schedules: config.schedules,
+    };
+
+    // Only add repeat and endDate if they have values
+    if (config.repeat !== 'none') {
+      schedule.repeat = config.repeat;
+      schedule.endDate = config.endDate;
+    }
+
+    updateItem(selectedItem.id, {
+      schedule,
+      updatedBy: user.uid
+    });
+
+    setScheduleDialogOpen(false);
+    setSelectedItem(null);
+  };
+
+  const handleUnschedule = (itemId: string) => {
+    if (!user) return;
+    deleteItem(itemId);
+  };
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
@@ -46,6 +82,7 @@ export default function DashboardPage() {
               {todayItems.map(item => {
                 // Find the schedule for today to show the time
                 const todaySchedule = item.schedule?.schedules.find(s => s.day === new Date().getDay());
+                const goal = activeGoals.find(g => g.id === item.referenceId);
 
                 return (
                   <li key={item.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50">
@@ -63,6 +100,25 @@ export default function DashboardPage() {
                           </p>
                         )}
                       </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSelectedItem(item);
+                          setScheduleDialogOpen(true);
+                        }}
+                      >
+                        <CalendarIcon className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleUnschedule(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
                   </li>
                 );
@@ -90,6 +146,20 @@ export default function DashboardPage() {
 
         <UnscheduledTasks />
       </div>
+
+      {selectedItem && (
+        <ScheduleDialog
+          open={scheduleDialogOpen}
+          onClose={() => {
+            setScheduleDialogOpen(false);
+            setSelectedItem(null);
+          }}
+          onSchedule={handleReschedule}
+          itemName={selectedItem.notes}
+          targetDate={activeGoals.find(g => g.id === selectedItem.referenceId)?.targetDate}
+          initialSchedule={selectedItem.schedule}
+        />
+      )}
     </div>
   );
 } 
