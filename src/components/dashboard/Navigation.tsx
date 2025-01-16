@@ -15,12 +15,13 @@ import {
   ListTodo,
   MapPin,
   BrickWall,
-  CalendarDays
+  CalendarDays,
+  LucideIcon
 } from 'lucide-react';
 
 interface BaseNavItem {
   name: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
 }
 
 interface NavItemWithHref extends BaseNavItem {
@@ -77,10 +78,10 @@ export function Navigation() {
       <Link
         href={item.href}
         className={cn(
-          'group flex items-center gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold',
+          'group flex items-center gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold focus-ring hover-lift',
           isActive
-            ? 'bg-gray-50 text-blue-600'
-            : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50',
+            ? 'bg-primary-muted text-primary'
+            : 'text-muted-foreground hover:text-primary hover:bg-secondary',
           nested && 'ml-7'
         )}
       >
@@ -88,8 +89,8 @@ export function Navigation() {
           className={cn(
             'h-6 w-6 shrink-0',
             isActive
-              ? 'text-blue-600'
-              : 'text-gray-400 group-hover:text-blue-600'
+              ? 'text-primary'
+              : 'text-muted-foreground group-hover:text-primary'
           )}
           aria-hidden="true"
         />
@@ -105,11 +106,12 @@ export function Navigation() {
     return (
       <div>
         <button
+          type="button"
           onClick={() => toggleSection(item.name)}
-          className="group flex w-full items-center gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-gray-700 hover:text-blue-600 hover:bg-gray-50"
+          className="group flex w-full items-center gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold text-muted-foreground hover:text-primary hover:bg-secondary focus-ring hover-lift"
         >
           <Icon
-            className="h-6 w-6 shrink-0 text-gray-400 group-hover:text-blue-600"
+            className="h-6 w-6 shrink-0 text-muted-foreground group-hover:text-primary"
             aria-hidden="true"
           />
           {item.name}
@@ -120,7 +122,7 @@ export function Navigation() {
           )}
         </button>
         {isOpen && (
-          <div className="mt-1">
+          <div className="mt-1 space-y-1">
             {item.children.map((child) => (
               <NavLink key={child.href} item={child} nested />
             ))}
