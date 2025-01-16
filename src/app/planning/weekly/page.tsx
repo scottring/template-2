@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { WeeklySchedule } from '@/components/planning/WeeklySchedule';
 import { ScheduleDialog } from '@/components/planning/ScheduleDialog';
-import { ItineraryItem, Goal, TimeScale } from '@/types/models';
+import { ItineraryItem, Goal, TimeScale, Schedule } from '@/types/models';
 import { Trash2, CalendarIcon, CheckCircle, ChevronDown, ChevronRight, ArrowRight, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/contexts/AuthContext';
 
 interface PlanningSession {
   step: 'review' | 'schedule';
@@ -35,6 +36,7 @@ interface ScheduleConfig {
 
 export default function WeeklyPlanningPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<{
@@ -54,25 +56,37 @@ export default function WeeklyPlanningPage() {
     ongoingItems: new Set(),
   });
 
-  const { goals, loadGoals, updateGoal } = useGoalStore();
+  const { goals, fetchGoals: loadGoals, updateGoal } = useGoalStore();
   const { getActiveHabits, updateItemSchedule } = useItineraryStore();
   const activeHabits = getActiveHabits();
 
   // Load goals when component mounts
   useEffect(() => {
-    loadGoals().catch(error => {
-      console.error('Error loading goals:', error);
-    });
-  }, [loadGoals]);
+    if (user?.householdId) {
+      loadGoals(user.householdId).catch(error => {
+        console.error('Error loading goals:', error);
+      });
+    }
+  }, [loadGoals, user?.householdId]);
 
   const currentGoal = goals[session.currentGoalIndex];
 
   const handleSchedule = (scheduleConfig: ScheduleConfig) => {
     if (selectedItem && session.markedItems.has(selectedItem.id)) {
       // Convert the new schedule format to the old format
-      const schedule: ItineraryItem['schedule'] = {
+      const schedule: Schedule = {
+        startDate: new Date(),
         schedules: scheduleConfig.schedules,
         repeat: scheduleConfig.repeat
+      };
+
+      const itineraryItem: Partial<ItineraryItem> = {
+        type: 'habit',
+        referenceId: selectedItem.id,
+        schedule,
+        status: 'pending',
+        createdBy: user?.uid || '',
+        updatedBy: user?.uid || '',
       };
 
       updateItemSchedule(selectedItem.id, schedule);
