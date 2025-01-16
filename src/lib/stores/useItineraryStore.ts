@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { ItineraryItem, Schedule, TimeScale, Goal, SuccessCriteria } from '@/types/models';
-import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where, getDoc, setDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where, getDoc, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { startOfDay, endOfDay, addDays, isSameDay, isWithinInterval } from 'date-fns';
 
@@ -49,7 +49,7 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
         id: docRef.id,
         createdAt: new Date(),
         updatedAt: new Date(),
-      };
+      } as ItineraryItem;
       set(state => ({
         items: [...state.items, newItem],
       }));
@@ -111,48 +111,35 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
 
   updateItemSchedule: async (id, schedule) => {
     try {
-      // Split the composite ID to get the goal ID and criteria text
       const [goalId, ...criteriaParts] = id.split('-');
       const criteriaText = criteriaParts.join('-');
 
-      // First check if the document exists
       const docRef = doc(db, 'itinerary', id);
       const docSnap = await getDoc(docRef);
 
-      if (!docSnap.exists()) {
-        // If document doesn't exist, create it first
-        await setDoc(docRef, {
-          id,
-          notes: criteriaText,
-          referenceId: goalId,
-          schedule,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          status: 'pending',
-          type: 'habit'
-        });
+      const newItem: Partial<ItineraryItem> = {
+        id,
+        notes: criteriaText,
+        referenceId: goalId,
+        schedule,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        status: 'pending',
+        type: 'habit',
+        createdBy: 'system',
+        updatedBy: 'system'
+      };
 
-        // Update local state
+      if (!docSnap.exists()) {
+        await setDoc(docRef, newItem);
         set(state => ({
-          items: [...state.items, {
-            id,
-            notes: criteriaText,
-            referenceId: goalId,
-            schedule,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            status: 'pending',
-            type: 'habit'
-          }],
+          items: [...state.items, newItem as ItineraryItem],
         }));
       } else {
-        // Document exists, just update the schedule
         await updateDoc(docRef, {
           schedule,
           updatedAt: new Date(),
         });
-
-        // Update local state
         set(state => ({
           items: state.items.map(item =>
             item.id === id
@@ -165,6 +152,69 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
       console.error('Error updating item schedule:', error);
       throw error;
     }
+  },
+
+  completeItem: async (id: string, userId: string) => {
+    try {
+      const docRef = doc(db, 'itinerary', id);
+      await updateDoc(docRef, {
+        status: 'completed',
+        updatedAt: new Date(),
+        updatedBy: userId
+      });
+      set(state => ({
+        items: state.items.map(item =>
+          item.id === id
+            ? { ...item, status: 'completed', updatedAt: new Date(), updatedBy: userId }
+            : item
+        ),
+      }));
+    } catch (error) {
+      console.error('Error completing item:', error);
+      throw error;
+    }
+  },
+
+  clearAllItems: async () => {
+    try {
+      const batch = writeBatch(db);
+      const items = get().items;
+      items.forEach(item => {
+        const docRef = doc(db, 'itinerary', item.id);
+        batch.delete(docRef);
+      });
+      await batch.commit();
+      set({ items: [] });
+    } catch (error) {
+      console.error('Error clearing items:', error);
+      throw error;
+    }
+  },
+
+  getStreak: (itemId: string) => {
+    const items = get().items;
+    const item = items.find(i => i.id === itemId);
+    if (!item) return 0;
+    
+    let streak = 0;
+    const today = new Date();
+    let currentDate = startOfDay(today);
+    
+    while (true) {
+      const completedOnDate = items.some(i => 
+        i.id === itemId && 
+        i.status === 'completed' && 
+        i.updatedAt && 
+        isSameDay(i.updatedAt, currentDate)
+      );
+      
+      if (!completedOnDate) break;
+      
+      streak++;
+      currentDate = addDays(currentDate, -1);
+    }
+    
+    return streak;
   },
 
   getActiveHabits: () => {
@@ -185,14 +235,11 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
         const { schedules, repeat } = item.schedule;
         const dayOfWeek = today.getDay();
 
-        // Check if any schedule matches today
         return schedules.some(schedule => {
           if (schedule.day !== dayOfWeek) return false;
 
-          // For daily items, always return true
           if (repeat === 'daily') return true;
 
-          // For weekly items, check if it's been a week since last update
           if (repeat === 'weekly') {
             if (!item.updatedAt) return true;
             const lastUpdate = startOfDay(item.updatedAt);
@@ -200,21 +247,11 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
             return today >= nextDue;
           }
 
-          // For monthly items, check if it's been a month
           if (repeat === 'monthly') {
             if (!item.updatedAt) return true;
             const lastUpdate = startOfDay(item.updatedAt);
             const nextDue = new Date(lastUpdate);
             nextDue.setMonth(nextDue.getMonth() + 1);
-            return today >= nextDue;
-          }
-
-          // For quarterly items, check if it's been three months
-          if (repeat === 'quarterly') {
-            if (!item.updatedAt) return true;
-            const lastUpdate = startOfDay(item.updatedAt);
-            const nextDue = new Date(lastUpdate);
-            nextDue.setMonth(nextDue.getMonth() + 3);
             return today >= nextDue;
           }
 
@@ -236,14 +273,11 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
       if (item.schedule) {
         const { schedules, repeat } = item.schedule;
         
-        // Check if any schedule matches the given day
         return schedules.some(schedule => {
           if (schedule.day !== dayOfWeek) return false;
 
-          // For daily items, always return true
           if (repeat === 'daily') return true;
 
-          // For weekly items, check if it's within the week
           if (repeat === 'weekly') {
             if (!item.updatedAt) return true;
             const lastUpdate = startOfDay(item.updatedAt);
@@ -251,21 +285,11 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
             return isWithinInterval(date, { start: lastUpdate, end: nextDue });
           }
 
-          // For monthly items, check if it's within the month
           if (repeat === 'monthly') {
             if (!item.updatedAt) return true;
             const lastUpdate = startOfDay(item.updatedAt);
             const nextDue = new Date(lastUpdate);
             nextDue.setMonth(nextDue.getMonth() + 1);
-            return isWithinInterval(date, { start: lastUpdate, end: nextDue });
-          }
-
-          // For quarterly items, check if it's within the quarter
-          if (repeat === 'quarterly') {
-            if (!item.updatedAt) return true;
-            const lastUpdate = startOfDay(item.updatedAt);
-            const nextDue = new Date(lastUpdate);
-            nextDue.setMonth(nextDue.getMonth() + 3);
             return isWithinInterval(date, { start: lastUpdate, end: nextDue });
           }
 
@@ -285,14 +309,12 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
     return items.filter(item => {
       if (item.status === 'completed') return false;
 
-      // Check due date if it exists
       if (item.dueDate) {
         return isWithinInterval(item.dueDate, { start: dayStart, end: dayEnd });
       }
 
-      // Check schedule if it exists
       if (item.schedule) {
-        const { schedules, repeat } = item.schedule;
+        const { schedules } = item.schedule;
         return schedules.some(schedule => {
           const scheduleDate = new Date(startDate);
           scheduleDate.setHours(parseInt(schedule.time.split(':')[0]), parseInt(schedule.time.split(':')[1]));
@@ -312,19 +334,16 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
     return items.filter(item => {
       if (item.status === 'completed') return false;
 
-      // Check for overdue items
       if (item.dueDate && item.dueDate < todayStart) {
         return true;
       }
 
-      // Check for items with missed schedules
       if (item.schedule) {
         const { schedules, repeat } = item.schedule;
         const lastUpdate = item.updatedAt ? startOfDay(item.updatedAt) : null;
 
-        if (!lastUpdate) return true; // Never updated items need attention
+        if (!lastUpdate) return true;
 
-        // Calculate next due date based on repeat frequency
         let nextDue = new Date(lastUpdate);
         switch (repeat) {
           case 'daily':
@@ -336,12 +355,8 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
           case 'monthly':
             nextDue.setMonth(nextDue.getMonth() + 1);
             break;
-          case 'quarterly':
-            nextDue.setMonth(nextDue.getMonth() + 3);
-            break;
         }
 
-        // If we're past the next due date, this item needs attention
         if (today >= nextDue) {
           return true;
         }
@@ -355,7 +370,6 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
     try {
       const { addItem } = get();
       
-      // Generate habits from tracked success criteria
       const trackedCriteria = goal.successCriteria.filter(criteria => criteria.isTracked);
       
       for (const criteria of trackedCriteria) {
@@ -364,7 +378,10 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
           referenceId: goal.id,
           notes: criteria.text,
           status: 'pending',
+          createdBy: 'system',
+          updatedBy: 'system',
           schedule: {
+            startDate: new Date(),
             schedules: [{ day: new Date().getDay(), time: '09:00' }],
             repeat: criteria.timescale || 'weekly'
           }
