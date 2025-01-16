@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
-import useItineraryStore from '@/lib/stores/useItineraryStore';
-import useGoalStore from '@/lib/stores/useGoalStore';
-import { ItineraryItem, Goal } from '@/types/models';
-import { QuickAddButton } from '@/components/planning/QuickAddButton';
+import { Card } from "@/components/ui/card";
+import { QuickAddButton } from "@/components/planning/QuickAddButton";
+import useItineraryStore from "@/lib/stores/useItineraryStore";
+import useGoalStore from "@/lib/stores/useGoalStore";
+import { UnscheduledTasks } from "@/components/dashboard/UnscheduledTasks";
 
 export default function DashboardPage() {
   const { items: todayItems } = useItineraryStore();
@@ -18,7 +17,7 @@ export default function DashboardPage() {
         <QuickAddButton />
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="p-6">
           <h2 className="text-lg font-medium mb-4">Today's Schedule</h2>
           {todayItems.length === 0 ? (
@@ -55,6 +54,8 @@ export default function DashboardPage() {
             </ul>
           )}
         </Card>
+
+        <UnscheduledTasks />
       </div>
     </div>
   );
