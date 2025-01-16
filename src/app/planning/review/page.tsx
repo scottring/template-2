@@ -91,10 +91,10 @@ export default function ReviewPage() {
       householdId: user?.householdId
     });
     
-    if (user?.householdId) {
+    if (user && user.householdId) {
       handleRefresh();
     }
-  }, [user?.householdId, handleRefresh]);
+  }, [user, user?.householdId, handleRefresh]);
 
   // Debug logging
   useEffect(() => {
@@ -202,12 +202,15 @@ export default function ReviewPage() {
 
   const currentItems = session.step === 'criteria' 
     ? allCriteria.filter(criteria => {
-        // If it's tracked and has a next occurrence in this week
-        if (criteria.isTracked && criteria.nextOccurrence) {
-          const nextOcc = new Date(criteria.nextOccurrence);
-          return nextOcc >= session.weekStartDate && nextOcc <= session.weekEndDate;
+        if (!criteria.isTracked) {
+          return false;
         }
-        return false;
+        if (!criteria.nextOccurrence) {
+          console.log('Skipping criteria due to missing nextOccurrence:', criteria.text);
+          return false;
+        }
+        const nextOcc = new Date(criteria.nextOccurrence);
+        return nextOcc >= session.weekStartDate && nextOcc <= session.weekEndDate;
       })
     : items.filter(item => {
         const itemDate = item.createdAt;
@@ -529,4 +532,4 @@ export default function ReviewPage() {
       </div>
     </div>
   );
-} 
+}

@@ -68,7 +68,8 @@ export default function QuickSchedulePage() {
       status: 'pending',
       notes: selectedCriteria.criteria.text,
       createdBy: user.uid,
-      updatedBy: user.uid
+      updatedBy: user.uid,
+      householdId: user.householdId ?? ''
     });
 
     setScheduleDialogOpen(false);
@@ -141,4 +142,4 @@ export default function QuickSchedulePage() {
       )}
     </div>
   );
-} 
+}

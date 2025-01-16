@@ -256,6 +256,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
         notes: criterion.text,
         createdBy: user.uid,
         updatedBy: user.uid,
+        householdId: user.householdId ?? ''
       });
     }
 
@@ -582,4 +583,4 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
       </DialogContent>
     </Dialog>
   );
-} 
+}

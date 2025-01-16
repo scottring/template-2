@@ -133,7 +133,8 @@ export function UnscheduledTasks() {
       status: 'pending',
       notes: selectedCriteria.criteria.text,
       createdBy: user.uid,
-      updatedBy: user.uid
+      updatedBy: user.uid,
+      householdId: user.householdId ?? ''
     });
 
     setScheduleDialogOpen(false);
@@ -287,4 +288,4 @@ export function UnscheduledTasks() {
       )}
     </Card>
   );
-} 
+}
