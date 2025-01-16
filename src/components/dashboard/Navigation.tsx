@@ -18,6 +18,8 @@ import {
   MapPin,
   BrickWall,
   CalendarDays,
+  CalendarRange,
+  CalendarClock,
   LucideIcon
 } from 'lucide-react';
 import { motion, Variants } from 'framer-motion';
@@ -41,7 +43,16 @@ type NavItem = NavItemWithHref | NavItemWithChildren;
 
 const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Planning & Review', href: '/planning', icon: CalendarDays },
+  { 
+    name: 'Planning & Review', 
+    icon: CalendarDays,
+    children: [
+      { name: 'Weekly Review', href: '/planning/review', icon: ClipboardList },
+      { name: 'Weekly Planning', href: '/planning/weekly', icon: CalendarDays },
+      { name: 'Monthly Planning', href: '/planning/monthly', icon: CalendarRange },
+      { name: 'Quarterly Planning', href: '/planning/quarterly', icon: CalendarClock },
+    ]
+  },
   { name: 'Itinerary', href: '/itinerary', icon: Map },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   {
