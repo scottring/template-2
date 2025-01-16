@@ -3,24 +3,19 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import {
-  Home,
+  LayoutDashboard,
   Target,
   ClipboardList,
   Calendar,
   Users,
   Settings,
-  LayoutDashboard,
-  CalendarDays,
-  CalendarRange,
-  CalendarClock,
-  Workflow,
   ChevronDown,
   ChevronRight,
   Map,
   ListTodo,
   MapPin,
   BrickWall,
-  Hammer
+  CalendarDays
 } from 'lucide-react';
 
 interface BaseNavItem {
@@ -42,8 +37,9 @@ type NavItem = NavItemWithHref | NavItemWithChildren;
 
 const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Calendar', href: '/calendar', icon: Calendar },
+  { name: 'Planning & Review', href: '/planning', icon: CalendarDays },
   { name: 'Itinerary', href: '/itinerary', icon: Map },
+  { name: 'Calendar', href: '/calendar', icon: Calendar },
   {
     name: 'Foundations',
     icon: BrickWall,
@@ -53,17 +49,6 @@ const navigation: NavItem[] = [
       { name: 'Tasks', href: '/tasks', icon: ListTodo },   
     ],
   },
-  
- {
-    name: 'Action',
-    icon: Hammer,
-    children: [      
-      { name: 'Weekly Planning & Review', href: '/planning/weekly', icon: CalendarDays },
-      { name: 'Monthly Planning & Review', href: '/planning/monthly', icon: CalendarRange },
-      { name: 'Quarterly Planning & Review', href: '/planning/quarterly', icon: CalendarClock },
-    ],
-  },
-
   { name: 'Family', href: '/family', icon: Users },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
