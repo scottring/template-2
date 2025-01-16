@@ -24,7 +24,7 @@ interface AreaStore {
   
   // Core area operations
   fetchAreas: (householdId: string) => Promise<void>;
-  addArea: (area: Partial<Area>) => Promise<void>;
+  addArea: (area: Partial<Area>) => Promise<string>;
   updateArea: (areaId: string, updates: Partial<Area>) => Promise<void>;
   deleteArea: (areaId: string) => Promise<void>;
   migrateAreas: (householdId: string) => Promise<void>;
@@ -147,8 +147,10 @@ const useAreaStore = create<AreaStore>((set, get) => ({
       });
       const newArea = { ...area, id: docRef.id } as Area;
       set(state => ({ areas: [newArea, ...state.areas], loading: false }));
+      return docRef.id;
     } catch (error) {
       set({ error: 'Failed to add area', loading: false });
+      throw error;
     }
   },
 

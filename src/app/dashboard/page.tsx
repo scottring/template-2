@@ -1,42 +1,61 @@
 'use client';
 
-import { JourneyTimeline } from "@/components/journey/JourneyTimeline";
-import { StartPlanningButton } from "@/components/planning/StartPlanningButton";
-import { useJourneyStore } from "@/lib/stores/useJourneyStore";
-import { Card } from "@/components/ui/card";
+import { useEffect, useState } from 'react';
+import { Card } from '@/components/ui/card';
+import useItineraryStore from '@/lib/stores/useItineraryStore';
+import useGoalStore from '@/lib/stores/useGoalStore';
+import { ItineraryItem, Goal } from '@/types/models';
+import { QuickAddButton } from '@/components/planning/QuickAddButton';
 
 export default function DashboardPage() {
-  const { stageIndex, startPlanning, timeScale } = useJourneyStore();
-
-  const handleStartPlanning = () => {
-    startPlanning(timeScale);
-  };
+  const { items: todayItems } = useItineraryStore();
+  const { goals: activeGoals } = useGoalStore();
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
-      {/* Journey Timeline Section */}
-      <section>
-        <JourneyTimeline 
-          currentStage={stageIndex}
-          onStageClick={(index) => console.log('Stage clicked:', index)}
-        />
-      </section>
+    <div className="space-y-6 p-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <QuickAddButton />
+      </div>
 
-      {/* Start Planning Section */}
-      <section className="flex justify-center py-8">
-        <Card className="p-8 flex flex-col items-center space-y-4 max-w-2xl w-full">
-          <h2 className="text-2xl font-bold text-gray-900">Ready to Plan?</h2>
-          <p className="text-gray-600 text-center mb-4">
-            Start your {timeScale}ly planning session to organize goals, distribute tasks, and align your household's vision.
-          </p>
-          <StartPlanningButton 
-            onClick={handleStartPlanning}
-            timeScale={timeScale}
-          />
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="p-6">
+          <h2 className="text-lg font-medium mb-4">Today's Schedule</h2>
+          {todayItems.length === 0 ? (
+            <p className="text-muted-foreground">No items scheduled for today</p>
+          ) : (
+            <ul className="space-y-2">
+              {todayItems.map(item => (
+                <li key={item.id} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={item.status === 'completed'}
+                    className="rounded border-gray-300"
+                  />
+                  <span>{item.notes}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
-      </section>
 
-      {/* Other dashboard content can go here */}
+        <Card className="p-6">
+          <h2 className="text-lg font-medium mb-4">Active Goals</h2>
+          {activeGoals.length === 0 ? (
+            <p className="text-muted-foreground">No active goals</p>
+          ) : (
+            <ul className="space-y-2">
+              {activeGoals.map(goal => (
+                <li key={goal.id}>
+                  <a href={`/goals/${goal.id}`} className="hover:underline">
+                    {goal.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
     </div>
   );
 } 

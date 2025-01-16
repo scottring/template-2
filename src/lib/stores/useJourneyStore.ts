@@ -35,7 +35,7 @@ interface JourneyState {
   updateSession: (updates: Partial<PlanningSession>) => void;
   
   // Planning flow
-  startPlanning: () => void;
+  startPlanning: (customStartDate?: Date) => void;
   nextPlanningStep: () => void;
   completePlanning: () => void;
   
@@ -96,8 +96,9 @@ export const useJourneyStore = create<JourneyState>()(
         } : null
       })),
 
-      startPlanning: () => {
-        const effectiveStartDate = get().getEffectivePlanningStartDate();
+      startPlanning: (customStartDate?: Date) => {
+        const effectiveStartDate = customStartDate || get().getEffectivePlanningStartDate();
+        
         set({
           isInPlanningSessions: true,
           currentStage: "review-and-planning",
