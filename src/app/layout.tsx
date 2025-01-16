@@ -6,7 +6,7 @@ import { Toaster } from '@/components/ui/toaster';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'Symphony - Orchestrate Your Life',
+  title: `SymphGoal-${process.env.NEXT_PUBLIC_ENV === 'production' ? 'Prod' : 'Dev'}`,
   description: 'A powerful tool for collaborative life planning and goal achievement.',
 };
 

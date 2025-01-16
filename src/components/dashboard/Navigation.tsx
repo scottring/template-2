@@ -41,7 +41,7 @@ interface NavItemWithChildren extends BaseNavItem {
 type NavItem = NavItemWithHref | NavItemWithChildren;
 
 const navigation: NavItem[] = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Itinerary', href: '/itinerary', icon: Map },
   {
