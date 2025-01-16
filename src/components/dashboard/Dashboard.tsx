@@ -1,23 +1,42 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, Transition, Menu } from '@headlessui/react';
 import { Fragment } from 'react';
 import { Menu as MenuIcon, X } from 'lucide-react';
 import { Navigation } from './Navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { QuickAddButton } from '@/components/planning/QuickAddButton';
+import { usePathname } from 'next/navigation';
+import { QuickScheduleDialog } from '@/components/planning/QuickScheduleDialog';
 
 interface DashboardProps {
   children: React.ReactNode;
 }
 
 export function Dashboard({ children }: DashboardProps) {
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+
+  // Add keyboard shortcut listener
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      // Command/Ctrl + K to open quick add
+      if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+        event.preventDefault();
+        setIsQuickAddOpen(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
 
   return (
-    <>
+    <div className="flex min-h-screen">
       <Transition.Root show={sidebarOpen} as={Fragment}>
         <Dialog as="div" className="relative z-50 lg:hidden" onClose={setSidebarOpen}>
           <Transition.Child
@@ -99,7 +118,16 @@ export function Dashboard({ children }: DashboardProps) {
           <div className="h-6 w-px bg-gray-200 lg:hidden" aria-hidden="true" />
 
           <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-            <div className="flex flex-1"></div>
+            <div className="flex flex-1 items-center">
+              <QuickAddButton 
+                variant="outline"
+                size="sm"
+                className="ml-4"
+              />
+              <span className="ml-2 text-sm text-muted-foreground hidden sm:inline">
+                Press ⌘K to quick add
+              </span>
+            </div>
             <div className="flex items-center gap-x-4 lg:gap-x-6">
               <Menu as="div" className="relative">
                 <Menu.Button className="-m-1.5 flex items-center p-1.5">
@@ -145,6 +173,12 @@ export function Dashboard({ children }: DashboardProps) {
           <div className="px-4 sm:px-6 lg:px-8">{children}</div>
         </main>
       </div>
-    </>
+
+      {/* Add the QuickScheduleDialog controlled by keyboard shortcut */}
+      <QuickScheduleDialog
+        open={isQuickAddOpen}
+        onClose={() => setIsQuickAddOpen(false)}
+      />
+    </div>
   );
 }

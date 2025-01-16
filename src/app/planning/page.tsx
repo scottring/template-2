@@ -1,89 +1,67 @@
 'use client';
 
 import { useRouter } from "next/navigation";
-import { JourneyTimeline } from "@/components/journey/JourneyTimeline";
-import { StartPlanningButton } from "@/components/planning/StartPlanningButton";
 import { useJourneyStore } from "@/lib/stores/useJourneyStore";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { format } from "date-fns";
-import { CalendarDays, AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { format, subWeeks, startOfWeek } from "date-fns";
 
 export default function PlanningPage() {
   const router = useRouter();
-  const { 
-    stageIndex, 
-    startPlanning, 
-    isInPlanningSessions,
-    planningStep,
-    getEffectivePlanningStartDate,
-    shouldIncludeLargerTimeScaleGoals
-  } = useJourneyStore();
-
-  const effectiveStartDate = getEffectivePlanningStartDate();
-  const { monthly, quarterly, yearly } = shouldIncludeLargerTimeScaleGoals();
-  const hasLargerTimeScaleGoals = monthly || quarterly || yearly;
+  const { startPlanning } = useJourneyStore();
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   const handleStartPlanning = () => {
-    startPlanning();
-    router.push("/planning/review-goals");
+    let planningDate;
+    if (selectedDate) {
+      planningDate = startOfWeek(new Date(selectedDate));
+    }
+    startPlanning(planningDate);
+    router.push('/planning/review-goals');
   };
 
-  // If we're in a planning session, redirect to the appropriate step
-  if (isInPlanningSessions && planningStep !== "not_started") {
-    const stepRoutes = {
-      review_goals: "/planning/review-goals",
-      mark_for_scheduling: "/planning/mark-items",
-      schedule_items: "/planning/schedule",
-      complete: "/planning/complete"
-    };
-    
-    router.push(stepRoutes[planningStep]);
-    return null;
-  }
+  // Calculate date for 1 week ago as default
+  const defaultDate = format(subWeeks(new Date(), 1), 'yyyy-MM-dd');
 
   return (
-    <div className="container mx-auto py-8 space-y-8">
-      {/* Journey Timeline */}
-      <section>
-        <JourneyTimeline 
-          currentStage={stageIndex}
-          onStageClick={(index) => console.log('Stage clicked:', index)}
-        />
-      </section>
-
-      {/* Planning Controls */}
-      <section className="flex justify-center py-8">
-        <Card className="p-8 flex flex-col items-center space-y-6 max-w-2xl w-full">
-          <h2 className="text-2xl font-bold text-gray-900">Start Weekly Planning</h2>
-          
-          {hasLargerTimeScaleGoals && (
-            <Alert className="bg-blue-50 border-blue-200">
-              <AlertCircle className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-700">
-                {yearly ? "It's the start of a new year! " : ""}
-                {quarterly ? "A new quarter is beginning! " : ""}
-                {monthly ? "It's the start of a new month! " : ""}
-                We'll include relevant goals in this week's planning session.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <div className="flex items-center gap-2 text-gray-600">
-            <CalendarDays className="w-5 h-5" />
-            <span>Planning period will start from {format(effectiveStartDate, 'MMMM d, yyyy')}</span>
+    <div className="container mx-auto py-8">
+      <h1 className="text-2xl font-bold mb-6">Planning & Review</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold mb-4">Start Weekly Planning</h2>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="planningDate" className="block text-sm font-medium text-gray-700 mb-1">
+                Planning Week Start Date (optional)
+              </label>
+              <Input
+                type="date"
+                id="planningDate"
+                defaultValue={defaultDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Leave empty to use the default planning schedule
+              </p>
+            </div>
+            <Button onClick={handleStartPlanning} className="w-full">
+              Start Weekly Planning
+            </Button>
           </div>
-
-          <p className="text-gray-600 text-center">
-            Start your weekly planning session to organize goals, distribute tasks, and align your household's vision.
-            {hasLargerTimeScaleGoals && " We'll also review and adjust longer-term goals during this session."}
-          </p>
-
-          <StartPlanningButton 
-            onClick={handleStartPlanning}
-          />
         </Card>
-      </section>
+
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold mb-4">Planning Schedule</h2>
+          <p className="text-gray-600">
+            Configure your regular planning schedule and preferences.
+          </p>
+          {/* Add planning schedule configuration UI here */}
+        </Card>
+      </div>
     </div>
   );
 } 

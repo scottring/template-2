@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { TimeScale } from '@/types/models';
 
-interface ScheduleConfig {
+export interface ScheduleConfig {
   schedules: Array<{ day: number; time: string }>;
   repeat: TimeScale;
 }
