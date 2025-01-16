@@ -1,72 +1,78 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { query, collection, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase/firebase';
-import { Goal, Project, SuccessCriteria } from '@/types/models';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, PlusIcon, MoreVertical, Calendar, Target, Share2, Trash2 } from 'lucide-react';
-import useGoalStore from '@/lib/stores/useGoalStore';
-import { useProjectStore } from '@/lib/stores/useProjectStore';
-import { Menu, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
-import { CreateProjectDialog } from '@/components/projects/CreateProjectDialog';
-import { TasksSection } from '@/components/goals/TasksSection';
-import { Notepad } from '@/components/shared/Notepad';
-import { SharedIndicator } from '@/components/shared/SharedIndicator';
-import { ShareDialog } from '@/components/shared/ShareDialog';
-import { QuerySnapshot, DocumentData } from 'firebase/firestore';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Menu, Transition } from "@headlessui/react";
+import { Fragment } from "react";
+import {
+  ArrowLeft,
+  Calendar,
+  MoreVertical,
+  PlusIcon,
+  Share2,
+  Target,
+  Trash2,
+} from "lucide-react";
+import useGoalStore from "@/lib/stores/useGoalStore";
+import { useProjectStore } from "@/lib/stores/useProjectStore";
+import { Goal, Project, SuccessCriteria } from "@/types/models";
+import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
+import { ShareDialog } from "@/components/shared/ShareDialog";
+import { SharedIndicator } from "@/components/shared/SharedIndicator";
+import { TasksSection } from "@/components/goals/TasksSection";
+import { Notepad } from "@/components/shared/Notepad";
 
 export default function GoalDetailPage({ params }: { params: { id: string } }) {
-  const [loading, setLoading] = useState(true);
   const [isCreateProjectDialogOpen, setIsCreateProjectDialogOpen] = useState(false);
   const [sharingGoal, setSharingGoal] = useState<Goal | null>(null);
   const router = useRouter();
-  const { goals, deleteGoal } = useGoalStore();
+  
+  const { goals, loading, error } = useGoalStore();
   const { projects, setProjects } = useProjectStore();
   const goal = goals.find((g: Goal) => g.id === params.id);
-  const goalProjects: Project[] = projects.filter((project) => project.goalId === params.id);
+  const goalProjects = projects.filter((project: Project) => project.goalId === params.id);
 
+  // If we're not loading and there's no goal, redirect
   useEffect(() => {
     if (!loading && !goal) {
-      router.push('/areas');
+      router.push('/goals');
     }
   }, [goal, loading, router]);
 
-  useEffect(() => {
-    const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
-      const projects = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate(),
-          updatedAt: data.updatedAt?.toDate(),
-          startDate: data.startDate?.toDate(),
-          endDate: data.endDate?.toDate(),
-        } as Project;
-      });
-      setProjects(projects);
-    });
-    return () => unsubscribe();
-  }, [setProjects]);
-
   const handleDeleteGoal = async () => {
+    if (!goal) return;
+    
     if (window.confirm('Are you sure you want to delete this goal? This action cannot be undone.')) {
       try {
-        await deleteGoal(goal!.id);
-        router.push('/areas');
+        await useGoalStore.getState().deleteGoal(goal.id);
+        router.push('/goals');
       } catch (error) {
         console.error('Error deleting goal:', error);
       }
     }
   };
 
-  if (loading || !goal) {
-    return <div>Loading...</div>;
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-32 w-32 animate-spin rounded-full border-b-2 border-t-2 border-blue-500" />
+      </div>
+    );
   }
 
+  if (error) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="text-red-500">Error loading goal: {error}</div>
+      </div>
+    );
+  }
+
+  if (!goal) {
+    return null;
+  }
+
+  // Rest of the component remains the same...
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -81,9 +87,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
             <h1 className="text-2xl font-semibold">{goal.name}</h1>
             <div className="flex items-center gap-x-2 text-sm text-gray-500">
               <Calendar className="h-4 w-4" />
-              <span>
-                Due {goal.targetDate?.toLocaleDateString()}
-              </span>
+              <span>Due {goal.targetDate?.toLocaleDateString()}</span>
               <Target className="ml-2 h-4 w-4" />
               <span>{goal.progress}% complete</span>
               <SharedIndicator sharedWith={goal.assignedTo} />

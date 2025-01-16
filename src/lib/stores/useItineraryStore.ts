@@ -19,6 +19,7 @@ interface ItineraryStore {
   updateItemSchedule: (id: string, schedule: Schedule) => Promise<void>;
   completeItem: (id: string, userId: string) => Promise<void>;
   clearAllItems: () => Promise<void>;
+  updateCriteriaStatus: (itemId: string, status: 'pending' | 'completed' | 'cancelled' | 'ongoing') => Promise<void>;
   
   // Item queries
   getActiveHabits: () => ItineraryItem[];
@@ -391,6 +392,26 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
       }
     } catch (error) {
       console.error('Error generating habits from goal:', error);
+      throw error;
+    }
+  },
+
+  updateCriteriaStatus: async (itemId: string, status: 'pending' | 'completed' | 'cancelled' | 'ongoing') => {
+    try {
+      const docRef = doc(db, 'itinerary', itemId);
+      await updateDoc(docRef, {
+        status,
+        updatedAt: new Date(),
+      });
+      set(state => ({
+        items: state.items.map(item =>
+          item.id === itemId
+            ? { ...item, status, updatedAt: new Date() }
+            : item
+        ),
+      }));
+    } catch (error) {
+      console.error('Error updating criteria status:', error);
       throw error;
     }
   },

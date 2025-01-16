@@ -1,112 +1,88 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { CalendarDays, CalendarRange, CalendarClock, ArrowRight, CheckCircle2, ListChecks, Calendar } from 'lucide-react';
-
-const planningTypes = [
-  {
-    title: 'Weekly Planning',
-    description: 'Plan your week ahead, schedule tasks and habits, and ensure a balanced workload.',
-    icon: CalendarDays,
-    link: '/planning/weekly',
-    status: 'Ready',
-    color: 'bg-blue-100 text-blue-600'
-  },
-  {
-    title: 'Monthly Planning',
-    description: 'Review and adjust monthly goals, plan major milestones, and distribute work across weeks.',
-    icon: CalendarRange,
-    link: '/planning/monthly',
-    status: 'Ready',
-    color: 'bg-purple-100 text-purple-600'
-  },
-  {
-    title: 'Quarterly Planning',
-    description: 'Set strategic goals, plan key initiatives, and align your monthly objectives.',
-    icon: CalendarClock,
-    link: '/planning/quarterly',
-    status: 'Ready',
-    color: 'bg-green-100 text-green-600'
-  }
-];
-
-const tutorialSteps = [
-  {
-    title: 'Review Goals',
-    description: 'Start by reviewing your goals and their success criteria. This helps you understand what needs to be scheduled.',
-    icon: ListChecks
-  },
-  {
-    title: 'Mark for Scheduling',
-    description: 'Select which success criteria need to be scheduled. You can mark multiple items before moving to scheduling.',
-    icon: CheckCircle2
-  },
-  {
-    title: 'Schedule Items',
-    description: 'Choose when and how often each item should occur. The schedule view helps you maintain balance.',
-    icon: Calendar
-  }
-];
+import { useRouter } from "next/navigation";
+import { JourneyTimeline } from "@/components/journey/JourneyTimeline";
+import { StartPlanningButton } from "@/components/planning/StartPlanningButton";
+import { useJourneyStore } from "@/lib/stores/useJourneyStore";
+import { Card } from "@/components/ui/card";
+import { format } from "date-fns";
+import { CalendarDays, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function PlanningPage() {
   const router = useRouter();
+  const { 
+    stageIndex, 
+    startPlanning, 
+    isInPlanningSessions,
+    planningStep,
+    getEffectivePlanningStartDate,
+    shouldIncludeLargerTimeScaleGoals
+  } = useJourneyStore();
+
+  const effectiveStartDate = getEffectivePlanningStartDate();
+  const { monthly, quarterly, yearly } = shouldIncludeLargerTimeScaleGoals();
+  const hasLargerTimeScaleGoals = monthly || quarterly || yearly;
+
+  const handleStartPlanning = () => {
+    startPlanning();
+    router.push("/planning/review-goals");
+  };
+
+  // If we're in a planning session, redirect to the appropriate step
+  if (isInPlanningSessions && planningStep !== "not_started") {
+    const stepRoutes = {
+      review_goals: "/planning/review-goals",
+      mark_for_scheduling: "/planning/mark-items",
+      schedule_items: "/planning/schedule",
+      complete: "/planning/complete"
+    };
+    
+    router.push(stepRoutes[planningStep]);
+    return null;
+  }
 
   return (
-    <div className="container mx-auto py-6 space-y-8">
-      <div className="border-b pb-4">
-        <h1 className="text-2xl font-bold">Planning</h1>
-        <p className="text-gray-600 mt-2">Choose a planning session to get started</p>
-      </div>
-
-      {/* Planning Sessions */}
+    <div className="container mx-auto py-8 space-y-8">
+      {/* Journey Timeline */}
       <section>
-        <h2 className="text-xl font-semibold mb-4">Planning Sessions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {planningTypes.map((type) => {
-            const Icon = type.icon;
-            return (
-              <Card 
-                key={type.title}
-                className="p-6 cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => router.push(type.link)}
-              >
-                <div className={`w-12 h-12 rounded-lg ${type.color} flex items-center justify-center mb-4`}>
-                  <Icon className="w-6 h-6" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">{type.title}</h3>
-                <p className="text-gray-600 mb-4">{type.description}</p>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-500">{type.status}</span>
-                  <ArrowRight className="w-5 h-5 text-gray-400" />
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+        <JourneyTimeline 
+          currentStage={stageIndex}
+          onStageClick={(index) => console.log('Stage clicked:', index)}
+        />
       </section>
 
-      {/* How Planning Works */}
-      <section>
-        <h2 className="text-xl font-semibold mb-4">How Planning Works</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {tutorialSteps.map((step, index) => {
-            const Icon = step.icon;
-            return (
-              <Card key={step.title} className="p-6">
-                <div className="flex items-center mb-4">
-                  <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mr-3">
-                    {index + 1}
-                  </div>
-                  <Icon className="w-6 h-6 text-gray-600" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
-                <p className="text-gray-600">{step.description}</p>
-              </Card>
-            );
-          })}
-        </div>
+      {/* Planning Controls */}
+      <section className="flex justify-center py-8">
+        <Card className="p-8 flex flex-col items-center space-y-6 max-w-2xl w-full">
+          <h2 className="text-2xl font-bold text-gray-900">Start Weekly Planning</h2>
+          
+          {hasLargerTimeScaleGoals && (
+            <Alert className="bg-blue-50 border-blue-200">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-700">
+                {yearly ? "It's the start of a new year! " : ""}
+                {quarterly ? "A new quarter is beginning! " : ""}
+                {monthly ? "It's the start of a new month! " : ""}
+                We'll include relevant goals in this week's planning session.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="flex items-center gap-2 text-gray-600">
+            <CalendarDays className="w-5 h-5" />
+            <span>Planning period will start from {format(effectiveStartDate, 'MMMM d, yyyy')}</span>
+          </div>
+
+          <p className="text-gray-600 text-center">
+            Start your weekly planning session to organize goals, distribute tasks, and align your household's vision.
+            {hasLargerTimeScaleGoals && " We'll also review and adjust longer-term goals during this session."}
+          </p>
+
+          <StartPlanningButton 
+            onClick={handleStartPlanning}
+          />
+        </Card>
       </section>
     </div>
   );
