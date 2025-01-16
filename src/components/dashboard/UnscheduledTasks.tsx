@@ -149,6 +149,7 @@ export function UnscheduledTasks() {
           }}
           onSchedule={handleSchedule}
           itemName={selectedCriteria.criteria.text}
+          targetDate={goals.find(g => g.id === selectedCriteria.goalId)?.targetDate}
         />
       )}
     </Card>

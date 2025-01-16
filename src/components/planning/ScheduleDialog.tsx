@@ -11,10 +11,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { TimeScale } from '@/types/models';
+import { format } from 'date-fns';
 
 export interface ScheduleConfig {
   schedules: Array<{ day: number; time: string }>;
-  repeat: TimeScale;
+  repeat: TimeScale | 'none';
+  endDate?: Date;
 }
 
 interface ScheduleDialogProps {
@@ -22,6 +24,7 @@ interface ScheduleDialogProps {
   onClose: () => void;
   onSchedule: (config: ScheduleConfig) => void;
   itemName: string;
+  targetDate?: Date;
 }
 
 const WEEKDAYS = [
@@ -39,18 +42,35 @@ const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {
   return `${hour}:00`;
 });
 
-export function ScheduleDialog({ open, onClose, onSchedule, itemName }: ScheduleDialogProps) {
+export function ScheduleDialog({ open, onClose, onSchedule, itemName, targetDate }: ScheduleDialogProps) {
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
-  const [selectedTime, setSelectedTime] = useState('09:00');
-  const [repeat, setRepeat] = useState<TimeScale>('weekly');
+  const [dayTimes, setDayTimes] = useState<Record<number, string>>({});
+  const [repeat, setRepeat] = useState<TimeScale | 'none'>('weekly');
+  const [endDate, setEndDate] = useState<Date | undefined>(targetDate);
 
   const handleDayToggle = (dayIndex: number) => {
     setSelectedDays((prev) => {
       if (prev.includes(dayIndex)) {
+        // Remove the day and its time
+        const newDayTimes = { ...dayTimes };
+        delete newDayTimes[dayIndex];
+        setDayTimes(newDayTimes);
         return prev.filter((d) => d !== dayIndex);
       }
+      // Add the day with default time
+      setDayTimes(prev => ({
+        ...prev,
+        [dayIndex]: '09:00'
+      }));
       return [...prev, dayIndex];
     });
+  };
+
+  const handleTimeChange = (dayIndex: number, time: string) => {
+    setDayTimes(prev => ({
+      ...prev,
+      [dayIndex]: time
+    }));
   };
 
   const handleSchedule = () => {
@@ -60,12 +80,13 @@ export function ScheduleDialog({ open, onClose, onSchedule, itemName }: Schedule
 
     const schedules = selectedDays.map(day => ({
       day,
-      time: selectedTime,
+      time: dayTimes[day] || '09:00', // Fallback to default time if not set
     }));
 
     onSchedule({
       schedules,
       repeat,
+      endDate: repeat === 'none' ? undefined : endDate,
     });
   };
 
@@ -96,33 +117,50 @@ export function ScheduleDialog({ open, onClose, onSchedule, itemName }: Schedule
             </div>
           </div>
 
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">Select Time</h4>
-            <select
-              value={selectedTime}
-              onChange={(e) => setSelectedTime(e.target.value)}
-              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
-            >
-              {TIME_SLOTS.map((time) => (
-                <option key={time} value={time}>
-                  {time}
-                </option>
+          {selectedDays.length > 0 && (
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium">Select Times</h4>
+              {selectedDays.map(dayIndex => (
+                <div key={dayIndex} className="flex items-center gap-2">
+                  <span className="w-20 text-sm">{WEEKDAYS[dayIndex]}:</span>
+                  <select
+                    value={dayTimes[dayIndex] || '09:00'}
+                    onChange={(e) => handleTimeChange(dayIndex, e.target.value)}
+                    className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
+                  >
+                    {TIME_SLOTS.map((time) => (
+                      <option key={time} value={time}>
+                        {time}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               ))}
-            </select>
-          </div>
+            </div>
+          )}
 
           <div className="space-y-2">
             <h4 className="text-sm font-medium">Repeat</h4>
             <select
               value={repeat}
-              onChange={(e) => setRepeat(e.target.value as TimeScale)}
+              onChange={(e) => setRepeat(e.target.value as TimeScale | 'none')}
               className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
             >
+              <option value="none">No repeat (one-time)</option>
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
               <option value="quarterly">Quarterly</option>
             </select>
+            {repeat !== 'none' && (
+              <p className="text-sm text-muted-foreground">
+                {repeat === 'daily' && 'Will repeat every day'}
+                {repeat === 'weekly' && 'Will repeat every week on the selected days'}
+                {repeat === 'monthly' && 'Will repeat every month on these days'}
+                {repeat === 'quarterly' && 'Will repeat every three months on these days'}
+                {targetDate ? ` until ${format(targetDate, 'MMM d, yyyy')}` : ''}
+              </p>
+            )}
           </div>
         </div>
 
