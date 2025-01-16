@@ -49,9 +49,12 @@ const useTaskStore = create<TaskStore>((set, get) => ({
         where('householdId', '==', householdId),
         orderBy('createdAt', 'desc')
       );
-      const snapshot = await getDocs(q);
-      const tasks = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Task));
-      set({ tasks, loading: false });
+      onSnapshot(q, (snapshot) => {
+        const tasks = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Task));
+        set({ tasks, loading: false });
+      }, (error) => {
+        set({ error: 'Failed to fetch tasks', loading: false });
+      });
     } catch (error) {
       set({ error: 'Failed to fetch tasks', loading: false });
     }
@@ -175,4 +178,4 @@ const useTaskStore = create<TaskStore>((set, get) => ({
   }
 }));
 
-export default useTaskStore; 
+export default useTaskStore;
