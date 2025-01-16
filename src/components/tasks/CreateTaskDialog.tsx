@@ -3,7 +3,7 @@
 import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X as XMarkIcon } from 'lucide-react';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
+import useTaskStore from '@/lib/stores/useTaskStore';
 
 interface CreateTaskDialogProps {
   projectId?: string;
