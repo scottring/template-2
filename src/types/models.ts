@@ -130,6 +130,8 @@ export interface ItineraryItem extends BaseItem {
   schedule: Schedule;
   status: 'pending' | 'completed' | 'cancelled' | 'ongoing';
   notes: string;
+  householdId: string;
+  dueDate?: Date;
 }
 
 export type TaskCategory = 'chore' | 'errand' | 'maintenance' | 'kids' | 'meal' | 'shopping' | 'finance' | 'health' | 'social' | 'other';

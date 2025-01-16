@@ -57,6 +57,61 @@ const useGoalStore = create<GoalStore>((set, get) => ({
   loading: false,
   error: null,
 
+  fetchGoals: async (householdId: string) => {
+    console.log('Fetching goals for household:', householdId);
+    set({ loading: true, error: null });
+    try {
+      const goalsRef = collection(db, 'goals');
+      console.log('Created goals collection reference');
+      
+      const q = query(
+        goalsRef,
+        where('householdId', '==', householdId),
+        orderBy('createdAt', 'desc')
+      );
+      console.log('Created query:', {
+        collection: 'goals',
+        householdId,
+        orderBy: 'createdAt'
+      });
+      
+      try {
+        const snapshot = await getDocs(q);
+        console.log(`Found ${snapshot.size} goals`);
+        
+        const goals = snapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log('Processing goal:', {
+            id: doc.id,
+            name: data.name,
+            status: data.status,
+            criteria: data.successCriteria?.length || 0,
+            householdId: data.householdId
+          });
+          return {
+            ...convertFirestoreTimestamps(data),
+            id: doc.id,
+          };
+        }) as Goal[];
+        
+        console.log('Setting goals in store:', {
+          count: goals.length,
+          statuses: goals.map(g => g.status),
+          householdIds: goals.map(g => g.householdId)
+        });
+        set({ goals, loading: false });
+      } catch (queryError) {
+        console.error('Error executing query:', queryError);
+        set({ error: 'Failed to execute goals query', loading: false });
+        throw queryError;
+      }
+    } catch (error) {
+      console.error('Error in fetchGoals:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to fetch goals', loading: false });
+      throw error;
+    }
+  },
+
   migrateGoals: async (householdId: string) => {
     set({ loading: true, error: null });
     try {
@@ -83,29 +138,6 @@ const useGoalStore = create<GoalStore>((set, get) => ({
     } catch (error) {
       console.error('Error migrating goals:', error);
       set({ error: 'Failed to migrate goals', loading: false });
-    }
-  },
-
-  fetchGoals: async (householdId: string) => {
-    set({ loading: true, error: null });
-    try {
-      const goalsRef = collection(db, 'goals');
-      const q = query(
-        goalsRef,
-        where('householdId', '==', householdId),
-        orderBy('createdAt', 'desc')
-      );
-      
-      const snapshot = await getDocs(q);
-      const goals = snapshot.docs.map(doc => ({
-        ...convertFirestoreTimestamps(doc.data()),
-        id: doc.id,
-      })) as Goal[];
-      
-      set({ goals, loading: false });
-    } catch (error) {
-      console.error('Error fetching goals:', error);
-      set({ error: 'Failed to fetch goals', loading: false });
     }
   },
 
