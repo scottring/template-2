@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User as FirebaseUser, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
+import { User as FirebaseUser, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, browserLocalPersistence, setPersistence } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, addDoc } from 'firebase/firestore';
@@ -32,12 +32,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('Setting up auth state listener');
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
+        console.log('Auth state changed:', firebaseUser?.uid);
         if (firebaseUser) {
           // Fetch user's household ID from Firestore
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           const householdId = userDoc.data()?.householdId;
+          
+          console.log('Fetched household ID:', householdId);
           
           const userWithHousehold = {
             ...firebaseUser,
@@ -45,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } as User;
           setUser(userWithHousehold);
         } else {
+          console.log('No user found');
           setUser(null);
         }
       } catch (error) {
@@ -63,14 +68,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setLoading(true);
       setError(null);
+      
+      // Set persistence to LOCAL
+      await setPersistence(auth, browserLocalPersistence);
+      
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
+      
+      console.log('Signed in with Google:', result.user.uid);
       
       // Create or update user document in Firestore
       const userRef = doc(db, 'users', result.user.uid);
       const userDoc = await getDoc(userRef);
       
       if (!userDoc.exists()) {
+        console.log('Creating new user document');
         // Create a new household
         const householdRef = await addDoc(collection(db, 'households'), {
           name: `${result.user.displayName}'s Household`,
@@ -83,20 +95,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             role: 'admin',
             displayName: result.user.displayName || '',
             photoURL: result.user.photoURL || '',
-            joinedAt: new Date(),
-            preferences: {
-              notifications: {
-                taskReminders: true,
-                planningReminders: true,
-                inventoryAlerts: true,
-                taskAssignments: true,
-                reminderHoursBefore: 24
-              },
-              defaultView: 'week',
-              colorScheme: 'blue'
-            }
-          }],
-          inviteCodes: []
+            joinedAt: new Date()
+          }]
         });
 
         // Create user document with household reference
@@ -109,6 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           householdId: householdRef.id
         });
 
+        console.log('Created new household:', householdRef.id);
+
         // Update user state with household ID
         const userWithHousehold = {
           ...result.user,
@@ -116,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } as User;
         setUser(userWithHousehold);
       } else {
+        console.log('User document exists');
         // User exists, update the user state with existing household ID
         const userData = userDoc.data();
         const userWithHousehold = {

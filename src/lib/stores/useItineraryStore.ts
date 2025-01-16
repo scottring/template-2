@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { ItineraryItem, Schedule, TimeScale, Goal, SuccessCriteria } from '@/types/models';
-import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where, getDoc, setDoc, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where, getDoc, setDoc, writeBatch, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { startOfDay, endOfDay, addDays, isSameDay, isWithinInterval } from 'date-fns';
 
@@ -13,7 +13,7 @@ interface ItineraryStore {
   addItem: (item: Omit<ItineraryItem, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   updateItem: (id: string, updates: Partial<ItineraryItem>) => Promise<void>;
   deleteItem: (id: string) => Promise<void>;
-  loadItems: () => Promise<void>;
+  loadItems: (householdId: string) => Promise<void>;
   
   // Schedule management
   updateItemSchedule: (id: string, schedule: Schedule) => Promise<void>;
@@ -38,7 +38,11 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
   loading: false,
   error: null,
 
-  addItem: async (item) => {
+  addItem: async (item: Omit<ItineraryItem, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!item.householdId) {
+      throw new Error('householdId is required');
+    }
+    
     try {
       const docRef = await addDoc(collection(db, 'itinerary'), {
         ...item,
@@ -93,20 +97,63 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
     }
   },
 
-  loadItems: async () => {
+  loadItems: async (householdId: string) => {
+    console.log('Loading itinerary items for household:', householdId);
     set({ loading: true, error: null });
     try {
-      const querySnapshot = await getDocs(collection(db, 'itinerary'));
-      const items = querySnapshot.docs.map(doc => ({
-        ...doc.data(),
-        id: doc.id,
-        createdAt: doc.data().createdAt?.toDate(),
-        updatedAt: doc.data().updatedAt?.toDate(),
-      })) as ItineraryItem[];
-      set({ items, loading: false });
+      const itineraryRef = collection(db, 'itinerary');
+      console.log('Created itinerary collection reference');
+      
+      const q = query(
+        itineraryRef,
+        where('householdId', '==', householdId),
+        orderBy('createdAt', 'desc')
+      );
+      
+      console.log('Created query:', {
+        collection: 'itinerary',
+        householdId,
+        orderBy: 'createdAt'
+      });
+      
+      try {
+        const querySnapshot = await getDocs(q);
+        console.log(`Found ${querySnapshot.size} itinerary items`);
+        
+        const items = querySnapshot.docs.map(doc => {
+          const data = doc.data();
+          console.log('Processing item:', {
+            id: doc.id,
+            notes: data.notes,
+            status: data.status,
+            type: data.type,
+            schedule: data.schedule?.repeat,
+            householdId: data.householdId
+          });
+          return {
+            ...data,
+            id: doc.id,
+            createdAt: data.createdAt?.toDate(),
+            updatedAt: data.updatedAt?.toDate(),
+          };
+        }) as ItineraryItem[];
+        
+        console.log('Setting items in store:', {
+          count: items.length,
+          types: items.map(i => i.type),
+          statuses: items.map(i => i.status),
+          householdIds: items.map(i => i.householdId)
+        });
+        set({ items, loading: false });
+      } catch (queryError) {
+        console.error('Error executing query:', queryError);
+        set({ error: 'Failed to execute itinerary query', loading: false });
+        throw queryError;
+      }
     } catch (error) {
-      console.error('Error loading items:', error);
-      set({ error: 'Failed to load items', loading: false });
+      console.error('Error in loadItems:', error);
+      set({ error: error instanceof Error ? error.message : 'Failed to load items', loading: false });
+      throw error;
     }
   },
 
@@ -381,6 +428,7 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
           status: 'pending',
           createdBy: 'system',
           updatedBy: 'system',
+          householdId: goal.householdId,
           schedule: {
             startDate: new Date(),
             schedules: [{ day: new Date().getDay(), time: '09:00' }],
