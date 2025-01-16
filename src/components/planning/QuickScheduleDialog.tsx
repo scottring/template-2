@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { PlusCircle, X } from 'lucide-react';
+import { PlusCircle, X, ListTodo, StickyNote } from 'lucide-react';
 import { TimeScale, Area, SuccessCriteria } from '@/types/models';
 import useAreaStore from '@/lib/stores/useAreaStore';
 import useGoalStore from '@/lib/stores/useGoalStore';
@@ -104,6 +104,52 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
         return prev.filter((d) => d !== dayIndex);
       }
       return [...prev, dayIndex];
+    });
+  };
+
+  const handleAddTask = (criteriaIndex: number) => {
+    handleUpdateCriteria(criteriaIndex, {
+      tasks: [
+        ...criteria[criteriaIndex].tasks,
+        { id: crypto.randomUUID(), text: '', completed: false }
+      ]
+    });
+  };
+
+  const handleRemoveTask = (criteriaIndex: number, taskIndex: number) => {
+    handleUpdateCriteria(criteriaIndex, {
+      tasks: criteria[criteriaIndex].tasks.filter((_, i) => i !== taskIndex)
+    });
+  };
+
+  const handleUpdateTask = (criteriaIndex: number, taskIndex: number, text: string) => {
+    handleUpdateCriteria(criteriaIndex, {
+      tasks: criteria[criteriaIndex].tasks.map((task, i) => 
+        i === taskIndex ? { ...task, text } : task
+      )
+    });
+  };
+
+  const handleAddNote = (criteriaIndex: number) => {
+    handleUpdateCriteria(criteriaIndex, {
+      notes: [
+        ...criteria[criteriaIndex].notes,
+        { id: crypto.randomUUID(), text: '', timestamp: new Date() }
+      ]
+    });
+  };
+
+  const handleRemoveNote = (criteriaIndex: number, noteIndex: number) => {
+    handleUpdateCriteria(criteriaIndex, {
+      notes: criteria[criteriaIndex].notes.filter((_, i) => i !== noteIndex)
+    });
+  };
+
+  const handleUpdateNote = (criteriaIndex: number, noteIndex: number, text: string) => {
+    handleUpdateCriteria(criteriaIndex, {
+      notes: criteria[criteriaIndex].notes.map((note, i) => 
+        i === noteIndex ? { ...note, text } : note
+      )
     });
   };
 
@@ -192,7 +238,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Quick Schedule</DialogTitle>
         </DialogHeader>
@@ -243,139 +289,183 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
           </div>
 
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <Label>Success Criteria</Label>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddCriteria}
-              >
-                <PlusCircle className="w-4 h-4 mr-2" />
-                Add Criteria
-              </Button>
-            </div>
+            <Label>Success Criteria</Label>
 
-            {criteria.map((item, index) => (
-              <Card key={index} className="p-4">
-                <div className="space-y-4">
-                  <div className="flex gap-2">
+            {criteria.map((criterion, index) => (
+              <Card key={index} className="p-4 space-y-4">
+                <div className="flex items-start gap-2">
+                  <div className="flex-1">
                     <Input
-                      placeholder="What does success look like?"
-                      value={item.text}
-                      onChange={(e) => handleUpdateCriteria(index, { text: e.target.value })}
-                      className="flex-1"
+                      placeholder="Enter success criteria"
+                      value={criterion.text}
+                      onChange={(e) =>
+                        handleUpdateCriteria(index, { text: e.target.value })
+                      }
                     />
-                    {index > 0 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveCriteria(index)}
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveCriteria(index)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {/* Schedule Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={criterion.isTracked}
+                      onChange={(e) => handleUpdateCriteria(index, { isTracked: e.target.checked })}
+                      className="rounded border-gray-300"
+                    />
+                    <Label className="text-sm font-normal">Track in Schedule</Label>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={item.isTracked}
-                        onChange={(e) => handleUpdateCriteria(index, { isTracked: e.target.checked })}
-                        className="rounded border-gray-300"
-                      />
-                      <span className="text-sm">Track in Itinerary</span>
-                    </label>
+                  {criterion.isTracked && (
+                    <div className="space-y-4 pl-6">
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Select Days</h4>
+                        <div className="grid grid-cols-7 gap-2">
+                          {WEEKDAYS.map((day, dayIndex) => (
+                            <Button
+                              key={day}
+                              type="button"
+                              variant={selectedDays.includes(dayIndex) ? 'default' : 'outline'}
+                              className="h-9 p-0"
+                              onClick={() => handleDayToggle(dayIndex)}
+                            >
+                              {day[0]}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
 
-                    {item.isTracked && (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          value={item.frequency || 1}
-                          onChange={(e) => handleUpdateCriteria(index, { frequency: parseInt(e.target.value) })}
-                          min="1"
-                          className="w-20"
-                        />
-                        <span className="text-sm">times per</span>
-                        <Select
-                          value={item.timescale || 'weekly'}
-                          onValueChange={(value) => handleUpdateCriteria(index, { timescale: value as TimeScale })}
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Select Time</h4>
+                        <select
+                          value={selectedTime}
+                          onChange={(e) => setSelectedTime(e.target.value)}
+                          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
                         >
-                          <SelectTrigger className="w-32">
+                          {TIME_SLOTS.map((time) => (
+                            <option key={time} value={time}>
+                              {time}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Repeat</h4>
+                        <Select
+                          value={repeat}
+                          onValueChange={(value) => setRepeat(value as TimeScale)}
+                        >
+                          <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="daily">Day</SelectItem>
-                            <SelectItem value="weekly">Week</SelectItem>
-                            <SelectItem value="monthly">Month</SelectItem>
-                            <SelectItem value="quarterly">Quarter</SelectItem>
+                            <SelectItem value="daily">Daily</SelectItem>
+                            <SelectItem value="weekly">Weekly</SelectItem>
+                            <SelectItem value="monthly">Monthly</SelectItem>
+                            <SelectItem value="quarterly">Quarterly</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                    )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tasks Section */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-sm">Tasks</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAddTask(index)}
+                    >
+                      <ListTodo className="w-4 h-4 mr-2" />
+                      Add Task
+                    </Button>
                   </div>
+                  {criterion.tasks.map((task, taskIndex) => (
+                    <div key={task.id} className="flex items-center gap-2">
+                      <Input
+                        placeholder="Enter task"
+                        value={task.text}
+                        onChange={(e) =>
+                          handleUpdateTask(index, taskIndex, e.target.value)
+                        }
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveTask(index, taskIndex)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Notes Section */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-sm">Notes</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAddNote(index)}
+                    >
+                      <StickyNote className="w-4 h-4 mr-2" />
+                      Add Note
+                    </Button>
+                  </div>
+                  {criterion.notes.map((note, noteIndex) => (
+                    <div key={note.id} className="flex items-center gap-2">
+                      <Textarea
+                        placeholder="Enter note"
+                        value={note.text}
+                        onChange={(e) =>
+                          handleUpdateNote(index, noteIndex, e.target.value)
+                        }
+                        className="flex-1"
+                        rows={2}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveNote(index, noteIndex)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               </Card>
             ))}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAddCriteria}
+              className="w-full"
+            >
+              <PlusCircle className="w-4 h-4 mr-2" />
+              Add Criteria
+            </Button>
           </div>
-
-          {criteria.some(c => c.isTracked) && (
-            <div className="space-y-4">
-              <Label>Schedule</Label>
-              
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium">Select Days</h4>
-                <div className="grid grid-cols-7 gap-2">
-                  {WEEKDAYS.map((day, index) => (
-                    <Button
-                      key={day}
-                      type="button"
-                      variant={selectedDays.includes(index) ? 'default' : 'outline'}
-                      className="h-9 p-0"
-                      onClick={() => handleDayToggle(index)}
-                    >
-                      {day[0]}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium">Select Time</h4>
-                <select
-                  value={selectedTime}
-                  onChange={(e) => setSelectedTime(e.target.value)}
-                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
-                >
-                  {TIME_SLOTS.map((time) => (
-                    <option key={time} value={time}>
-                      {time}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium">Repeat</h4>
-                <Select
-                  value={repeat}
-                  onValueChange={(value) => setRepeat(value as TimeScale)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="quarterly">Quarterly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
         </div>
 
         <DialogFooter>
