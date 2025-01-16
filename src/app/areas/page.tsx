@@ -16,26 +16,16 @@ import { ShareDialog } from '@/components/shared/ShareDialog';
 import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function AreasPage() {
+  const router = useRouter();
   const { user } = useAuth();
-  const areas = useAreaStore(state => state.areas);
-  const loading = useAreaStore(state => state.loading);
-  const error = useAreaStore(state => state.error);
-  const fetchAreas = useAreaStore(state => state.fetchAreas);
-  const deleteArea = useAreaStore(state => state.deleteArea);
-  const migrateAreas = useAreaStore(state => state.migrateAreas);
-  
-  const [sharingArea, setSharingArea] = useState<Area | null>(null);
+  const { areas, loading, error, fetchAreas, deleteArea } = useAreaStore();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingArea, setEditingArea] = useState<Area | null>(null);
-  const router = useRouter();
+  const [sharingArea, setSharingArea] = useState<Area | null>(null);
 
   useEffect(() => {
-    console.log('Auth state:', { user, householdId: user?.householdId });
     if (user?.householdId) {
-      console.log('Fetching areas for household:', user.householdId);
-      fetchAreas(user.householdId)
-        .then(() => console.log('Areas fetched:', areas))
-        .catch(error => console.error('Error fetching areas:', error));
+      fetchAreas(user.householdId);
     }
   }, [fetchAreas, user?.householdId]);
 
@@ -53,17 +43,6 @@ export default function AreasPage() {
       }
     }
   }, [deleteArea]);
-
-  const handleMigrateAreas = useCallback(async () => {
-    if (!user?.householdId) return;
-    if (window.confirm('Are you sure you want to migrate all areas to your household? This action cannot be undone.')) {
-      try {
-        await migrateAreas(user.householdId);
-      } catch (error) {
-        console.error('Error migrating areas:', error);
-      }
-    }
-  }, [migrateAreas, user?.householdId]);
 
   if (loading) {
     return (
@@ -86,12 +65,6 @@ export default function AreasPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Areas</h1>
         <div className="flex gap-2">
-          <button
-            onClick={handleMigrateAreas}
-            className="inline-flex items-center gap-x-1.5 rounded-md bg-yellow-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-yellow-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-600"
-          >
-            Migrate Areas
-          </button>
           <button
             onClick={() => setIsCreateDialogOpen(true)}
             className="inline-flex items-center gap-x-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
