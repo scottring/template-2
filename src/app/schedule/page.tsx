@@ -55,7 +55,8 @@ export default function QuickSchedulePage() {
       schedule: {
         startDate: new Date(),
         schedules: config.schedules,
-        repeat: config.repeat
+        repeat: config.repeat === 'none' ? undefined : config.repeat,
+        endDate: config.endDate
       },
       status: 'pending',
       notes: selectedCriteria.criteria.text,
@@ -128,6 +129,7 @@ export default function QuickSchedulePage() {
           }}
           onSchedule={handleSchedule}
           itemName={selectedCriteria.criteria.text}
+          targetDate={goals.find(g => g.id === selectedCriteria.goalId)?.targetDate}
         />
       )}
     </div>
