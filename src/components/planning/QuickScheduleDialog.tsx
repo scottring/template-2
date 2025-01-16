@@ -61,6 +61,9 @@ interface ScheduleTime {
   time: string;
 }
 
+// Local extension of TimeScale to include 'none'
+type ScheduleTimeScale = TimeScale | 'none';
+
 export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps) {
   const { user } = useAuth();
   const { areas, addArea } = useAreaStore();
@@ -82,7 +85,9 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
   // Schedule state
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [scheduleTimes, setScheduleTimes] = useState<ScheduleTime[]>([]);
-  const [repeat, setRepeat] = useState<TimeScale>('weekly');
+  const [repeat, setRepeat] = useState<ScheduleTimeScale>('weekly');
+  const [targetDate, setTargetDate] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
 
   const handleAddCriteria = () => {
     setCriteria([...criteria, { 
@@ -218,8 +223,8 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
       description: goalDescription,
       areaId,
       householdId: user.householdId,
-      startDate: new Date(),
-      targetDate: undefined,
+      startDate: new Date(startDate),
+      targetDate: targetDate ? new Date(targetDate) : undefined,
       progress: 0,
       status: 'not_started',
       successCriteria: criteria.map(c => ({
@@ -245,7 +250,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
         schedule: {
           startDate: new Date(),
           schedules: scheduleTimes,
-          repeat,
+          repeat: repeat === 'none' ? undefined : repeat,
         },
         status: 'pending',
         notes: criterion.text,
@@ -268,6 +273,8 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
     setSelectedDays([]);
     setScheduleTimes([]);
     setRepeat('weekly');
+    setTargetDate('');
+    setStartDate(new Date().toISOString().split('T')[0]);
     onClose();
   };
 
@@ -321,6 +328,24 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
               onChange={(e) => setGoalDescription(e.target.value)}
               rows={2}
             />
+            <div className="grid grid-cols-2 gap-4 mt-2">
+              <div className="space-y-2">
+                <Label className="text-sm">Start Date</Label>
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Target Date</Label>
+                <Input
+                  type="date"
+                  value={targetDate}
+                  onChange={(e) => setTargetDate(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -431,18 +456,25 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
                         <h4 className="text-sm font-medium">Repeat</h4>
                         <Select
                           value={repeat}
-                          onValueChange={(value) => setRepeat(value as TimeScale)}
+                          onValueChange={(value) => setRepeat(value as ScheduleTimeScale)}
                         >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="none">No Repeat</SelectItem>
                             <SelectItem value="daily">Daily</SelectItem>
                             <SelectItem value="weekly">Weekly</SelectItem>
                             <SelectItem value="monthly">Monthly</SelectItem>
                             <SelectItem value="quarterly">Quarterly</SelectItem>
                           </SelectContent>
                         </Select>
+
+                        {repeat !== 'none' && targetDate && (
+                          <div className="mt-2">
+                            <h4 className="text-sm font-medium mb-1">End Date: {new Date(targetDate).toLocaleDateString()}</h4>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -542,7 +574,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={!selectedArea || (selectedArea === 'new' && !newAreaName) || !goalName || !criteria[0].text}
+            disabled={!selectedArea || (selectedArea === 'new' && !newAreaName) || !goalName || criteria.length === 0 || !criteria[0]?.text}
           >
             Create & Schedule
           </Button>

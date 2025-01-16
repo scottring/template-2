@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Fragment } from 'react';
 import { addMonths } from 'date-fns';
 import { Goal, TimeScale } from '@/types/models';
@@ -19,11 +19,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import useAreaStore from '@/lib/stores/useAreaStore';
 
 interface CreateGoalDialogProps {
   open: boolean;
   onClose: () => void;
-  areaId: string;
 }
 
 interface SuccessCriteriaInput {
@@ -56,11 +63,20 @@ interface FormData {
   householdId: string;
 }
 
-export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProps) {
+export function CreateGoalDialog({ open, onClose }: CreateGoalDialogProps) {
   const addGoal = useGoalStore((state) => state.addGoal);
+  const { areas, addArea, fetchAreas } = useAreaStore();
   const { users } = useUserStore();
   const { user } = useAuth();
 
+  useEffect(() => {
+    if (open && user?.householdId) {
+      fetchAreas(user.householdId);
+    }
+  }, [open, user?.householdId, fetchAreas]);
+
+  const [selectedArea, setSelectedArea] = useState<string>('');
+  const [newAreaName, setNewAreaName] = useState('');
   const [formData, setFormData] = useState<FormData>({
     name: '',
     description: '',
@@ -83,6 +99,21 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      let areaId = selectedArea;
+      
+      if (selectedArea === 'new' && newAreaName) {
+        areaId = await addArea({
+          name: newAreaName,
+          description: '',
+          color: '#000000',
+          icon: 'folder',
+          householdId: user?.householdId || '',
+          isActive: true,
+          isFocus: false,
+          assignedTo: [user?.uid || ''],
+        });
+      }
+
       await addGoal({
         ...formData,
         areaId,
@@ -104,6 +135,8 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
         assignedTo: [],
         householdId: user?.householdId || ''
       });
+      setSelectedArea('');
+      setNewAreaName('');
     } catch (error) {
       console.error('Error creating goal:', error);
     } finally {
@@ -152,6 +185,35 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
         
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Area</Label>
+              <Select
+                value={selectedArea}
+                onValueChange={setSelectedArea}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an area" />
+                </SelectTrigger>
+                <SelectContent>
+                  {areas.map(area => (
+                    <SelectItem key={area.id} value={area.id}>
+                      {area.name}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="new">+ Create New Area</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {selectedArea === 'new' && (
+                <Input
+                  placeholder="New area name"
+                  value={newAreaName}
+                  onChange={(e) => setNewAreaName(e.target.value)}
+                  className="mt-2"
+                />
+              )}
+            </div>
+
             <div>
               <Label htmlFor="name">Name</Label>
               <Input
@@ -395,8 +457,11 @@ export function CreateGoalDialog({ open, onClose, areaId }: CreateGoalDialogProp
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating...' : 'Create Goal'}
+            <Button 
+              type="submit"
+              disabled={isSubmitting || !selectedArea || (selectedArea === 'new' && !newAreaName) || !formData.name}
+            >
+              Create Goal
             </Button>
           </div>
         </form>
