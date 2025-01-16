@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, ChevronRight } from 'lucide-react';
 import { ScheduleDialog } from '@/components/planning/ScheduleDialog';
 import useGoalStore from '@/lib/stores/useGoalStore';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
@@ -18,6 +19,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
+
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 }
+};
 
 interface CriteriaWithGoal {
   goalId: string;
@@ -126,29 +144,36 @@ export function UnscheduledTasks() {
   const displayedCriteria = unscheduledCriteria.slice(0, 5);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle>Unscheduled Tasks</CardTitle>
-        <div className="flex gap-2">
-          {hasMore && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push('/schedule')}
-            >
-              View All
-            </Button>
-          )}
-        </div>
+    <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
+        <CardTitle className="text-lg font-semibold bg-gradient-to-r from-primary to-accent-foreground bg-clip-text text-transparent">
+          Unscheduled Tasks
+        </CardTitle>
+        <Button
+          variant="ghost"
+          size="sm"
+          asChild
+          className="text-muted-foreground hover:text-primary transition-colors"
+        >
+          <Link href="/schedule" className="gap-1">
+            View All
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </Button>
       </CardHeader>
 
-      <CardContent>
-        <div className="flex gap-4 mb-4">
+      <CardContent className="p-6 pt-0">
+        <motion.div 
+          className="flex flex-col gap-4 mb-6 sm:flex-row"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
           <Select
             value={selectedArea}
             onValueChange={setSelectedArea}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px] border-primary/20 hover:border-primary/40 transition-colors">
               <SelectValue placeholder="Filter by Area" />
             </SelectTrigger>
             <SelectContent>
@@ -165,7 +190,7 @@ export function UnscheduledTasks() {
             value={selectedTimeScale}
             onValueChange={(value) => setSelectedTimeScale(value as TimeScale | 'all')}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px] border-primary/20 hover:border-primary/40 transition-colors">
               <SelectValue placeholder="Filter by Time Scale" />
             </SelectTrigger>
             <SelectContent>
@@ -177,26 +202,50 @@ export function UnscheduledTasks() {
               <SelectItem value="yearly">Yearly</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </motion.div>
 
         {groupedCriteria.length === 0 ? (
-          <div className="text-center py-4">
-            <p className="text-sm text-muted-foreground">No unscheduled tasks found</p>
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-8 rounded-lg bg-gradient-to-b from-accent/5 to-transparent"
+          >
+            <CalendarIcon className="h-12 w-12 mx-auto text-primary/30" />
+            <p className="text-muted-foreground mt-2">No unscheduled tasks found</p>
+          </motion.div>
         ) : (
-          <div className="space-y-6">
+          <motion.div 
+            className="space-y-6"
+            variants={container}
+            initial="hidden"
+            animate="show"
+          >
             {groupedCriteria.map(({ areaId, areaName, items }) => (
-              <div key={areaId}>
-                <h3 className="font-medium text-sm text-muted-foreground mb-2">{areaName}</h3>
+              <motion.div key={areaId} variants={item}>
+                <h3 className="font-medium text-sm text-primary/70 mb-3">{areaName}</h3>
                 <div className="space-y-2">
                   {items.map(({ goalId, goalName, criteria }) => (
-                    <div 
-                      key={criteria.id} 
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50"
+                    <motion.div 
+                      key={criteria.id}
+                      variants={item}
+                      className={cn(
+                        "group relative flex items-center justify-between p-3 rounded-lg transition-all duration-300",
+                        "bg-gradient-to-r from-background to-accent/5 hover:from-accent/5 hover:to-accent/10",
+                        "border border-primary/10 hover:border-primary/20",
+                        "shadow-sm hover:shadow-md"
+                      )}
                     >
-                      <div>
-                        <p className="font-medium">{criteria.text}</p>
-                        <p className="text-sm text-muted-foreground">{goalName}</p>
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg" />
+                      <div className="space-y-1 relative">
+                        <p className="font-medium group-hover:text-primary transition-colors">
+                          {criteria.text}
+                        </p>
+                        <Link 
+                          href={`/goals/${goalId}`}
+                          className="text-xs text-primary hover:text-primary/80 transition-colors block"
+                        >
+                          {goalName}
+                        </Link>
                         {criteria.frequency && criteria.timescale && (
                           <p className="text-xs text-muted-foreground">
                             Target: {criteria.frequency} times per {criteria.timescale}
@@ -210,16 +259,17 @@ export function UnscheduledTasks() {
                           setSelectedCriteria({ goalId, goalName, criteria, areaId, areaName });
                           setScheduleDialogOpen(true);
                         }}
+                        className="shrink-0 gap-2 border-primary/20 hover:border-primary hover:bg-primary/10 hover:text-primary transition-all relative"
                       >
-                        <CalendarIcon className="h-4 w-4 mr-2" />
+                        <CalendarIcon className="h-4 w-4" />
                         Schedule
                       </Button>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
       </CardContent>
 
