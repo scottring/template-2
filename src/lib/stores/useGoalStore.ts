@@ -12,7 +12,8 @@ import {
   where,
   orderBy,
   Timestamp,
-  serverTimestamp
+  serverTimestamp,
+  DocumentData
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { Goal, Task } from '@/types/models';
@@ -34,6 +35,22 @@ interface GoalStore {
   getGoalsByStatus: (status: Goal['status']) => Goal[];
   getUpcomingGoals: (days: number) => Goal[];
 }
+
+const convertFirestoreTimestamps = (data: DocumentData): Partial<Goal> => {
+  return {
+    ...data,
+    createdAt: data.createdAt?.toDate(),
+    updatedAt: data.updatedAt?.toDate(),
+    startDate: data.startDate?.toDate(),
+    targetDate: data.targetDate?.toDate(),
+    successCriteria: data.successCriteria?.map((c: any) => ({
+      ...c,
+      nextOccurrence: c.nextOccurrence?.toDate(),
+      tasks: c.tasks || [],
+      notes: c.notes || []
+    })) || []
+  };
+};
 
 const useGoalStore = create<GoalStore>((set, get) => ({
   goals: [],
@@ -72,19 +89,7 @@ const useGoalStore = create<GoalStore>((set, get) => ({
   fetchGoals: async (householdId: string) => {
     set({ loading: true, error: null });
     try {
-      console.log('Fetching goals for household:', householdId);
       const goalsRef = collection(db, 'goals');
-      
-      // First, let's see all goals regardless of householdId
-      const allGoalsQuery = query(goalsRef);
-      const allGoalsSnapshot = await getDocs(allGoalsQuery);
-      console.log('All goals in Firestore:', allGoalsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        householdId: doc.data().householdId,
-        name: doc.data().name
-      })));
-      
-      // Now query with the householdId filter
       const q = query(
         goalsRef,
         where('householdId', '==', householdId),
@@ -92,29 +97,11 @@ const useGoalStore = create<GoalStore>((set, get) => ({
       );
       
       const snapshot = await getDocs(q);
-      console.log('Goals matching current householdId:', snapshot.docs.map(doc => ({
+      const goals = snapshot.docs.map(doc => ({
+        ...convertFirestoreTimestamps(doc.data()),
         id: doc.id,
-        householdId: doc.data().householdId,
-        name: doc.data().name
-      })));
+      })) as Goal[];
       
-      const goals = snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          ...data,
-          id: doc.id,
-          createdAt: data.createdAt?.toDate(),
-          updatedAt: data.updatedAt?.toDate(),
-          startDate: data.startDate?.toDate(),
-          targetDate: data.targetDate?.toDate(),
-          successCriteria: data.successCriteria?.map((c: any) => ({
-            ...c,
-            nextOccurrence: c.nextOccurrence?.toDate()
-          })) || []
-        } as Goal;
-      });
-      
-      console.log('Setting goals in store:', goals);
       set({ goals, loading: false });
     } catch (error) {
       console.error('Error fetching goals:', error);
@@ -125,33 +112,35 @@ const useGoalStore = create<GoalStore>((set, get) => ({
   addGoal: async (goal: Partial<Goal>) => {
     set({ loading: true, error: null });
     try {
-      console.log('Adding goal:', goal);
       const docRef = await addDoc(collection(db, 'goals'), {
         ...goal,
         successCriteria: goal.successCriteria?.map(c => ({
           ...c,
-          nextOccurrence: c.nextOccurrence ? Timestamp.fromDate(c.nextOccurrence) : null
+          nextOccurrence: c.nextOccurrence ? Timestamp.fromDate(c.nextOccurrence) : null,
+          tasks: c.tasks || [],
+          notes: c.notes || []
         })) || [],
-        startDate: Timestamp.fromDate(goal.startDate as Date),
-        targetDate: Timestamp.fromDate(goal.targetDate as Date),
+        startDate: goal.startDate ? Timestamp.fromDate(goal.startDate) : null,
+        targetDate: goal.targetDate ? Timestamp.fromDate(goal.targetDate) : null,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        progress: goal.progress || 0,
+        status: goal.status || 'not_started'
       });
-      console.log('Goal added with ID:', docRef.id);
       
-      // Get the actual document to get server timestamps
       const docSnap = await getDoc(docRef);
       const data = docSnap.data();
       
-      const newGoal = {
-        ...goal,
-        id: docRef.id,
-        createdAt: data?.createdAt?.toDate() || new Date(),
-        updatedAt: data?.updatedAt?.toDate() || new Date()
-      } as Goal;
-      
-      set(state => ({ goals: [newGoal, ...state.goals], loading: false }));
-      return docRef.id;
+      if (data) {
+        const newGoal = {
+          ...convertFirestoreTimestamps(data),
+          id: docRef.id,
+        } as Goal;
+        
+        set(state => ({ goals: [newGoal, ...state.goals], loading: false }));
+        return docRef.id;
+      }
+      throw new Error('Failed to create goal document');
     } catch (error) {
       console.error('Error adding goal:', error);
       set({ error: 'Failed to add goal', loading: false });
@@ -164,38 +153,33 @@ const useGoalStore = create<GoalStore>((set, get) => ({
     try {
       const updateData = {
         ...updates,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        startDate: updates.startDate ? Timestamp.fromDate(updates.startDate) : undefined,
+        targetDate: updates.targetDate ? Timestamp.fromDate(updates.targetDate) : undefined,
+        successCriteria: updates.successCriteria?.map(c => ({
+          ...c,
+          nextOccurrence: c.nextOccurrence ? Timestamp.fromDate(c.nextOccurrence) : null,
+          tasks: c.tasks || [],
+          notes: c.notes || []
+        }))
       };
       
-      if (updates.startDate) {
-        updateData.startDate = Timestamp.fromDate(updates.startDate);
-      }
-      if (updates.targetDate) {
-        updateData.targetDate = Timestamp.fromDate(updates.targetDate);
-      }
-      if (updates.successCriteria) {
-        updateData.successCriteria = updates.successCriteria.map(c => ({
-          ...c,
-          nextOccurrence: c.nextOccurrence ? Timestamp.fromDate(c.nextOccurrence) : null
-        }));
-      }
-      
       await updateDoc(doc(db, 'goals', goalId), updateData);
-      
-      // Get the updated document to get server timestamp
       const docSnap = await getDoc(doc(db, 'goals', goalId));
       const data = docSnap.data();
       
-      set(state => ({
-        goals: state.goals.map(goal => 
-          goal.id === goalId ? {
-            ...goal,
-            ...updates,
-            updatedAt: data?.updatedAt?.toDate() || new Date()
-          } : goal
-        ),
-        loading: false
-      }));
+      if (data) {
+        set(state => ({
+          goals: state.goals.map(goal => 
+            goal.id === goalId ? {
+              ...goal,
+              ...convertFirestoreTimestamps(data),
+              id: goalId
+            } : goal
+          ),
+          loading: false
+        }));
+      }
     } catch (error) {
       console.error('Error updating goal:', error);
       set({ error: 'Failed to update goal', loading: false });

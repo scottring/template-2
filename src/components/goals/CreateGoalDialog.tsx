@@ -95,8 +95,10 @@ export function CreateGoalDialog({ open, onClose }: CreateGoalDialogProps) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!user?.householdId) return;
+    
     setIsSubmitting(true);
     try {
       let areaId = selectedArea;
@@ -107,18 +109,21 @@ export function CreateGoalDialog({ open, onClose }: CreateGoalDialogProps) {
           description: '',
           color: '#000000',
           icon: 'folder',
-          householdId: user?.householdId || '',
+          householdId: user.householdId,
           isActive: true,
           isFocus: false,
-          assignedTo: [user?.uid || ''],
+          assignedTo: [user.uid],
         });
       }
 
       await addGoal({
         ...formData,
         areaId,
-        successCriteria: formData.successCriteria.filter(c => c.text.trim())
-      });
+        successCriteria: formData.successCriteria.filter(c => c.text.trim()),
+        status: 'not_started',
+        progress: 0
+      } as Partial<Goal>);
+      
       onClose();
       setFormData({
         name: '',
@@ -133,7 +138,7 @@ export function CreateGoalDialog({ open, onClose }: CreateGoalDialogProps) {
           notes: []
         }],
         assignedTo: [],
-        householdId: user?.householdId || ''
+        householdId: user.householdId
       });
       setSelectedArea('');
       setNewAreaName('');
