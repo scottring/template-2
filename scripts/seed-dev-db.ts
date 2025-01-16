@@ -27,35 +27,6 @@ const sampleData = {
     name: 'Test Household',
     members: ['test@example.com']
   },
-  areas: [
-    {
-      name: 'Health & Fitness',
-      description: 'Physical and mental wellbeing goals',
-      color: '#4F46E5',
-      icon: 'heart',
-      isActive: true,
-      isFocus: true,
-      assignedTo: ['test@example.com']
-    },
-    {
-      name: 'Career Development',
-      description: 'Professional growth and skills',
-      color: '#10B981',
-      icon: 'briefcase',
-      isActive: true,
-      isFocus: false,
-      assignedTo: ['test@example.com']
-    },
-    {
-      name: 'Personal Finance',
-      description: 'Financial goals and management',
-      color: '#F59E0B',
-      icon: 'wallet',
-      isActive: true,
-      isFocus: false,
-      assignedTo: ['test@example.com']
-    }
-  ],
   goals: [
     {
       name: 'Test Goal 1',
@@ -92,7 +63,6 @@ async function seedDatabase() {
   try {
     // Clear existing data
     await clearCollection('households');
-    await clearCollection('areas');
     await clearCollection('goals');
     await clearCollection('tasks');
 
@@ -100,28 +70,13 @@ async function seedDatabase() {
     const householdRef = await db.collection('households').add(sampleData.household);
     console.log('Added test household:', householdRef.id);
 
-    // Add areas
-    for (const area of sampleData.areas) {
-      await db.collection('areas').add({
-        ...area,
-        householdId: householdRef.id,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy: 'test@example.com',
-        updatedBy: 'test@example.com'
-      });
-    }
-    console.log('Added test areas');
-
     // Add goals
     for (const goal of sampleData.goals) {
       await db.collection('goals').add({
         ...goal,
         householdId: householdRef.id,
         createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy: 'test@example.com',
-        updatedBy: 'test@example.com'
+        updatedAt: new Date()
       });
     }
     console.log('Added test goals');
@@ -132,9 +87,7 @@ async function seedDatabase() {
         ...task,
         householdId: householdRef.id,
         createdAt: new Date(),
-        updatedAt: new Date(),
-        createdBy: 'test@example.com',
-        updatedBy: 'test@example.com'
+        updatedAt: new Date()
       });
     }
     console.log('Added test tasks');
