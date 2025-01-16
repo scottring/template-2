@@ -56,6 +56,11 @@ const TIME_SLOTS = Array.from({ length: 24 }, (_, i) => {
   return `${hour}:00`;
 });
 
+interface ScheduleTime {
+  day: number;
+  time: string;
+}
+
 export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps) {
   const { user } = useAuth();
   const { areas, addArea } = useAreaStore();
@@ -76,7 +81,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
 
   // Schedule state
   const [selectedDays, setSelectedDays] = useState<number[]>([]);
-  const [selectedTime, setSelectedTime] = useState('09:00');
+  const [scheduleTimes, setScheduleTimes] = useState<ScheduleTime[]>([]);
   const [repeat, setRepeat] = useState<TimeScale>('weekly');
 
   const handleAddCriteria = () => {
@@ -101,9 +106,46 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
   const handleDayToggle = (dayIndex: number) => {
     setSelectedDays((prev) => {
       if (prev.includes(dayIndex)) {
+        setScheduleTimes(times => times.filter(t => t.day !== dayIndex));
         return prev.filter((d) => d !== dayIndex);
       }
+      setScheduleTimes(times => {
+        const existingTimes = times.filter(t => t.day === dayIndex);
+        if (existingTimes.length === 0) {
+          return [...times, { day: dayIndex, time: '09:00' }];
+        }
+        return times;
+      });
       return [...prev, dayIndex];
+    });
+  };
+
+  const handleAddTimeSlot = (dayIndex: number) => {
+    setScheduleTimes(prev => {
+      const dayTimes = prev.filter(t => t.day === dayIndex);
+      const lastTime = dayTimes.length > 0 ? dayTimes[dayTimes.length - 1].time : '09:00';
+      return [...prev, { day: dayIndex, time: lastTime }];
+    });
+  };
+
+  const handleRemoveTimeSlot = (dayIndex: number, timeIndex: number) => {
+    setScheduleTimes(prev => {
+      const dayTimes = prev.filter(t => t.day === dayIndex);
+      if (dayTimes.length <= 1) return prev;
+      
+      const timeToRemove = dayTimes[timeIndex];
+      return prev.filter(slot => slot !== timeToRemove);
+    });
+  };
+
+  const handleUpdateTime = (dayIndex: number, timeIndex: number, newTime: string) => {
+    setScheduleTimes(prev => {
+      const dayTimes = prev.filter(t => t.day === dayIndex);
+      const timeToUpdate = dayTimes[timeIndex];
+      
+      return prev.map(slot => 
+        slot === timeToUpdate ? { ...slot, time: newTime } : slot
+      );
     });
   };
 
@@ -158,7 +200,6 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
 
     let areaId = selectedArea;
     
-    // Create new area if needed
     if (selectedArea === 'new' && newAreaName) {
       areaId = await addArea({
         name: newAreaName,
@@ -172,7 +213,6 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
       });
     }
 
-    // Create goal with success criteria
     const goalId = await addGoal({
       name: goalName,
       description: goalDescription,
@@ -198,18 +238,13 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
     const trackedCriteria = criteria.filter(c => c.isTracked);
     
     for (const criterion of trackedCriteria) {
-      const schedules = selectedDays.map(day => ({
-        day,
-        time: selectedTime,
-      }));
-
       await addItem({
         type: 'task',
         referenceId: goalId,
-        criteriaId: criterion.text, // Using text as ID for now
+        criteriaId: criterion.text,
         schedule: {
           startDate: new Date(),
-          schedules,
+          schedules: scheduleTimes,
           repeat,
         },
         status: 'pending',
@@ -219,7 +254,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
       });
     }
 
-    // Reset form and close
+    // Reset form
     setSelectedArea('');
     setNewAreaName('');
     setGoalName('');
@@ -231,7 +266,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
       notes: []
     }]);
     setSelectedDays([]);
-    setSelectedTime('09:00');
+    setScheduleTimes([]);
     setRepeat('weekly');
     onClose();
   };
@@ -344,20 +379,53 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <h4 className="text-sm font-medium">Select Time</h4>
-                        <select
-                          value={selectedTime}
-                          onChange={(e) => setSelectedTime(e.target.value)}
-                          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
-                        >
-                          {TIME_SLOTS.map((time) => (
-                            <option key={time} value={time}>
-                              {time}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {selectedDays.map(dayIndex => {
+                        const dayTimes = scheduleTimes.filter(t => t.day === dayIndex);
+                        const uniqueDayTimes = Array.from(new Set(dayTimes.map(t => t.time)))
+                          .map(time => dayTimes.find(t => t.time === time)!);
+                        
+                        return (
+                          <div key={dayIndex} className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <h4 className="text-sm font-medium">{WEEKDAYS[dayIndex]} Times</h4>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleAddTimeSlot(dayIndex)}
+                              >
+                                <PlusCircle className="w-4 h-4 mr-2" />
+                                Add Time
+                              </Button>
+                            </div>
+                            {uniqueDayTimes.map((timeSlot, timeIndex) => (
+                              <div key={timeIndex} className="flex items-center gap-2">
+                                <select
+                                  value={timeSlot.time}
+                                  onChange={(e) => handleUpdateTime(dayIndex, timeIndex, e.target.value)}
+                                  className="flex-1 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
+                                >
+                                  {TIME_SLOTS.map((time) => (
+                                    <option key={time} value={time}>
+                                      {time}
+                                    </option>
+                                  ))}
+                                </select>
+                                {timeIndex > 0 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveTimeSlot(dayIndex, timeIndex)}
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
 
                       <div className="space-y-2">
                         <h4 className="text-sm font-medium">Repeat</h4>
