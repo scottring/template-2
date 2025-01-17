@@ -11,7 +11,8 @@ import {
   query, 
   where,
   orderBy,
-  onSnapshot
+  onSnapshot,
+  Unsubscribe
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { Task, TaskCategory, Goal, SuccessCriteria } from '@/types/models';
@@ -21,6 +22,7 @@ interface TaskStore {
   tasks: Task[];
   loading: boolean;
   error: string | null;
+  unsubscribe: Unsubscribe | null;
   
   // Core task operations
   fetchTasks: (householdId: string) => Promise<void>;
@@ -40,23 +42,48 @@ const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
   loading: false,
   error: null,
+  unsubscribe: null,
 
   fetchTasks: async (householdId: string) => {
-    set({ loading: true, error: null });
     try {
+      // Clean up previous subscription if it exists
+      const currentUnsubscribe = get().unsubscribe;
+      if (currentUnsubscribe) {
+        currentUnsubscribe();
+      }
+
+      set({ loading: true, error: null });
+      
       const q = query(
         collection(db, 'tasks'),
         where('householdId', '==', householdId),
         orderBy('createdAt', 'desc')
       );
-      onSnapshot(q, (snapshot) => {
-        const tasks = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Task));
-        set({ tasks, loading: false });
-      }, (error) => {
-        set({ error: 'Failed to fetch tasks', loading: false });
-      });
+
+      // Set up new subscription
+      const unsubscribe = onSnapshot(q, 
+        (snapshot) => {
+          const tasks = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Task));
+          set({ tasks, loading: false, error: null });
+        }, 
+        (error) => {
+          console.error('Error in tasks subscription:', error);
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to fetch tasks', 
+            loading: false 
+          });
+        }
+      );
+
+      // Store unsubscribe function
+      set({ unsubscribe });
+
     } catch (error) {
-      set({ error: 'Failed to fetch tasks', loading: false });
+      console.error('Error setting up tasks subscription:', error);
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to fetch tasks', 
+        loading: false 
+      });
     }
   },
 
