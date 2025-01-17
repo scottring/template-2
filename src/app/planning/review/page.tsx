@@ -7,9 +7,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { format, startOfWeek, endOfWeek } from "date-fns";
 import useGoalStore from "@/lib/stores/useGoalStore";
 import useItineraryStore from "@/lib/stores/useItineraryStore";
+import useTaskStore from "@/lib/stores/useTaskStore";
 import { CheckCircle2, XCircle, AlertCircle, ChevronRight, ChevronUp, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Goal, ItineraryItem, SuccessCriteria } from "@/types/models";
+import { Goal, ItineraryItem, SuccessCriteria, Task } from "@/types/models";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
   Tooltip,
@@ -44,6 +45,7 @@ export default function ReviewPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { goals, loading: goalsLoading, error: goalsError, fetchGoals } = useGoalStore();
   const { items, loading: itemsLoading, error: itemsError, loadItems } = useItineraryStore();
+  const { tasks, loading: tasksLoading, error: tasksError, fetchTasks } = useTaskStore();
   const [session, setSession] = useState<ReviewSession>({
     weekStartDate: startOfWeek(new Date()),
     weekEndDate: endOfWeek(new Date()),
@@ -70,18 +72,20 @@ export default function ReviewPage() {
     try {
       await Promise.all([
         fetchGoals(user.householdId),
-        loadItems(user.householdId)
+        loadItems(user.householdId),
+        fetchTasks(user.householdId)
       ]);
       console.log('Data fetched successfully:', {
         goals: goals.length,
-        items: items.length
+        items: items.length,
+        tasks: tasks.length
       });
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
       setIsRefreshing(false);
     }
-  }, [user?.householdId, fetchGoals, loadItems, goals.length, items.length]);
+  }, [user?.householdId, fetchGoals, loadItems, fetchTasks, goals.length, items.length, tasks.length]);
 
   // Initial data fetch
   useEffect(() => {
@@ -104,10 +108,13 @@ export default function ReviewPage() {
       goalsError,
       itemsLoading,
       itemsError,
+      tasksLoading,
+      tasksError,
       goalsCount: goals.length,
-      itemsCount: items.length
+      itemsCount: items.length,
+      tasksCount: tasks.length
     });
-  }, [isRefreshing, goalsLoading, goalsError, itemsLoading, itemsError, goals.length, items.length]);
+  }, [isRefreshing, goalsLoading, goalsError, itemsLoading, itemsError, tasksLoading, tasksError, goals.length, items.length, tasks.length]);
 
   // Show auth loading state
   if (authLoading) {
@@ -143,7 +150,7 @@ export default function ReviewPage() {
   }
 
   // Show loading state for initial load
-  if (!isRefreshing && (goalsLoading || itemsLoading)) {
+  if (!isRefreshing && (goalsLoading || itemsLoading || tasksLoading)) {
     console.log('Showing loading state');
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -156,8 +163,8 @@ export default function ReviewPage() {
   }
 
   // Show error state
-  if (goalsError || itemsError) {
-    console.log('Showing error state:', goalsError || itemsError);
+  if (goalsError || itemsError || tasksError) {
+    console.log('Showing error state:', goalsError || itemsError || tasksError);
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="space-y-4 text-center">
@@ -167,7 +174,7 @@ export default function ReviewPage() {
           <div>
             <p className="font-medium">Error Loading Data</p>
             <p className="text-sm text-muted-foreground mt-1">
-              {goalsError || itemsError}
+              {goalsError || itemsError || tasksError}
             </p>
             <Button 
               variant="outline" 
@@ -200,17 +207,40 @@ export default function ReviewPage() {
       }))
     );
 
+  // Get completed activities for the week
+  const getCompletedActivities = (criteria: any) => {
+    const completedItems = items.filter(item => 
+      item.referenceId === criteria.goalId && 
+      item.status === 'completed' &&
+      item.updatedAt >= session.weekStartDate &&
+      item.updatedAt <= session.weekEndDate
+    );
+
+    const completedTasks = tasks.filter(task =>
+      task.goalId === criteria.goalId &&
+      task.criteriaId === criteria.id &&
+      task.status === 'completed' &&
+      task.completedAt &&
+      task.completedAt >= session.weekStartDate &&
+      task.completedAt <= session.weekEndDate
+    );
+
+    return [...completedItems, ...completedTasks];
+  };
+
   const currentItems = session.step === 'criteria' 
     ? allCriteria.filter(criteria => {
         if (!criteria.isTracked) {
           return false;
         }
-        if (!criteria.nextOccurrence) {
-          console.log('Skipping criteria due to missing nextOccurrence:', criteria.text);
-          return false;
+        
+        if (criteria.nextOccurrence) {
+          const nextOcc = new Date(criteria.nextOccurrence);
+          return nextOcc >= session.weekStartDate && nextOcc <= session.weekEndDate;
         }
-        const nextOcc = new Date(criteria.nextOccurrence);
-        return nextOcc >= session.weekStartDate && nextOcc <= session.weekEndDate;
+        
+        console.log('Including criteria without nextOccurrence:', criteria.text);
+        return true;
       })
     : items.filter(item => {
         const itemDate = item.createdAt;
@@ -328,85 +358,145 @@ export default function ReviewPage() {
                 <p className="text-muted-foreground">
                   Review your success criteria for this week. Mark which ones you've achieved.
                 </p>
-                {currentItems.map((criteria: any) => (
-                  <motion.div
-                    key={criteria.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="flex items-center justify-between p-4 rounded-lg border border-primary/10 bg-card"
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium">{criteria.text}</p>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                          {criteria.timescale}
-                        </span>
+                {currentItems.map((criteria: any) => {
+                  const completedActivities = getCompletedActivities(criteria);
+                  return (
+                    <motion.div
+                      key={criteria.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex flex-col p-4 rounded-lg border border-primary/10 bg-card"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{criteria.text}</p>
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                              {criteria.timescale}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            Goal: {criteria.goalName}
+                          </p>
+                          {criteria.nextOccurrence && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Due: {format(new Date(criteria.nextOccurrence), 'MMM do')}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="hover:bg-primary/10 hover:text-primary"
+                                  onClick={() => handleStatusUpdate(criteria.id, 'completed', criteria.goalId, criteria.id)}
+                                >
+                                  <CheckCircle2 className="h-5 w-5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Mark as Achieved</p>
+                                <p className="text-xs text-muted-foreground">Successfully completed this criteria</p>
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="hover:bg-yellow-500/10 hover:text-yellow-500"
+                                  onClick={() => handleStatusUpdate(criteria.id, 'in_progress', criteria.goalId, criteria.id)}
+                                >
+                                  <AlertCircle className="h-5 w-5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Mark as Partially Done</p>
+                                <p className="text-xs text-muted-foreground">Made progress but not fully achieved</p>
+                              </TooltipContent>
+                            </Tooltip>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="hover:bg-destructive/10 hover:text-destructive"
+                                  onClick={() => handleStatusUpdate(criteria.id, 'not_started', criteria.goalId, criteria.id)}
+                                >
+                                  <XCircle className="h-5 w-5" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Mark as Not Done</p>
+                                <p className="text-xs text-muted-foreground">Didn't achieve this criteria</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Goal: {criteria.goalName}
-                      </p>
-                      {criteria.nextOccurrence && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Due: {format(new Date(criteria.nextOccurrence), 'MMM do')}
-                        </p>
+
+                      {/* Completed Activities Section */}
+                      {completedActivities.length > 0 && (
+                        <div className="mt-4 pl-4 border-l-2 border-primary/10">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-muted-foreground">
+                                Progress this week:
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {completedActivities.length} of {criteria.frequency || 1}
+                              </p>
+                            </div>
+                            
+                            {/* Progress Bar */}
+                            <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary transition-all duration-500" 
+                                style={{ 
+                                  width: `${Math.min(100, (completedActivities.length / (criteria.frequency || 1)) * 100)}%` 
+                                }}
+                              />
+                            </div>
+
+                            {/* Activity List */}
+                            <div className="mt-2 space-y-2">
+                              {completedActivities.map((activity) => {
+                                // Determine if this is a task or itinerary item
+                                const isTask = 'completedAt' in activity;
+                                const displayDate = isTask 
+                                  ? (activity as Task).completedAt 
+                                  : (activity as ItineraryItem).updatedAt;
+                                
+                                // Use the criteria text for the display text since that's what was actually completed
+                                const displayText = criteria.text;
+
+                                if (!displayDate) return null;
+
+                                return (
+                                  <div 
+                                    key={activity.id}
+                                    className="flex items-center gap-2 text-sm"
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 text-primary/60" />
+                                    <span>{displayText}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {format(displayDate, 'MMM do')}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
                       )}
-                    </div>
-                    <div className="flex gap-2">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="hover:bg-primary/10 hover:text-primary"
-                              onClick={() => handleStatusUpdate(criteria.id, 'completed', criteria.goalId, criteria.id)}
-                            >
-                              <CheckCircle2 className="h-5 w-5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Mark as Achieved</p>
-                            <p className="text-xs text-muted-foreground">Successfully completed this criteria</p>
-                          </TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="hover:bg-yellow-500/10 hover:text-yellow-500"
-                              onClick={() => handleStatusUpdate(criteria.id, 'in_progress', criteria.goalId, criteria.id)}
-                            >
-                              <AlertCircle className="h-5 w-5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Mark as Partially Done</p>
-                            <p className="text-xs text-muted-foreground">Made progress but not fully achieved</p>
-                          </TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() => handleStatusUpdate(criteria.id, 'not_started', criteria.goalId, criteria.id)}
-                            >
-                              <XCircle className="h-5 w-5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Mark as Not Done</p>
-                            <p className="text-xs text-muted-foreground">Didn't achieve this criteria</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
               </div>
             )}
 

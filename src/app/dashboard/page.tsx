@@ -146,7 +146,7 @@ export default function DashboardPage() {
                             <input
                               type="checkbox"
                               checked={item.status === 'completed'}
-                              className="peer absolute inset-0 opacity-0 cursor-pointer w-6 h-6"
+                              className="peer absolute inset-0 opacity-0 cursor-pointer w-8 h-8 -left-1 -top-1 z-10"
                               onChange={() => updateItem(item.id, { 
                                 status: item.status === 'completed' ? 'pending' : 'completed',
                                 updatedBy: user?.uid
@@ -158,7 +158,7 @@ export default function DashboardPage() {
                               item.status === 'completed' ? "bg-primary/10" : "bg-transparent"
                             )}>
                               <CheckCircle2 className={cn(
-                                "w-5 h-5 text-primary transition-opacity duration-200",
+                                "w-5 h-5 text-primary transition-opacity duration-200 pointer-events-none",
                                 item.status === 'completed' ? "opacity-100" : "opacity-0"
                               )} />
                             </div>
