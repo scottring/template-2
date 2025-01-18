@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import { CheckCircle2, Circle, ArrowUpRight } from 'lucide-react';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
 import useGoalStore from '@/lib/stores/useGoalStore';
-import { Goal, SuccessCriteria } from '@/types/models';
+import { Goal, Step } from '@/types/models';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -40,7 +40,7 @@ export function TodaySchedule({ date }: TodayScheduleProps) {
         <ul className="space-y-2">
           {items.map(item => {
             const goal = goals.find(g => g.id === item.referenceId);
-            const criteria = goal?.successCriteria?.find(c => c.id === item.criteriaId);
+            const step = goal?.steps?.find(s => s.id === item.criteriaId);
             
             return (
               <li key={item.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-accent">
@@ -58,17 +58,19 @@ export function TodaySchedule({ date }: TodayScheduleProps) {
                   
                   <div>
                     <div className="flex items-center space-x-2">
-                      <span className="font-medium">{goal?.name}</span>
-                      {criteria && (
-                        <span className="text-sm text-muted-foreground">
-                          - {criteria.text}
-                        </span>
-                      )}
+                      <span className="font-medium">
+                        {goal?.name}
+                      </span>
                     </div>
+                    {step && (
+                      <span className="text-sm text-muted-foreground">
+                        - {step.text}
+                      </span>
+                    )}
                     
-                    {item.schedule.recurrence && (
+                    {item.schedule?.repeat && (
                       <div className="text-sm text-muted-foreground">
-                        Every {item.schedule.recurrence.frequency} {item.schedule.recurrence.interval}
+                        Every {item.schedule.repeat}
                         {getStreak(item.id) > 0 && (
                           <span className="ml-2">
                             🔥 {getStreak(item.id)} day streak
@@ -78,7 +80,7 @@ export function TodaySchedule({ date }: TodayScheduleProps) {
                     )}
                   </div>
                 </div>
-                
+
                 <button
                   onClick={() => router.push(`/goals/${goal?.id}`)}
                   className="text-muted-foreground hover:text-primary"

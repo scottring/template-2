@@ -31,7 +31,7 @@ interface ItineraryStore {
   getProgress: (itemId: string) => { completed: number; total: number; lastUpdatedAt: Date } | null;
   
   // Goal integration
-  generateFromGoal: (goal: Goal) => Promise<void>;
+  generateFromGoal: (goal: Goal, scheduleDay?: number) => Promise<void>;
 }
 
 const useItineraryStore = create<ItineraryStore>((set, get) => ({
@@ -268,43 +268,101 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
 
   getActiveHabits: () => {
     const { items } = get();
-    return items.filter(item => item.type === 'habit' && item.status === 'pending');
+    console.log('Getting active habits:', {
+      totalItems: items.length,
+      habits: items.filter(item => item.type === 'habit').map(h => ({
+        id: h.id,
+        notes: h.notes,
+        status: h.status,
+        schedule: h.schedule
+      }))
+    });
+    
+    const activeHabits = items.filter(item => {
+      const isHabit = item.type === 'habit';
+      const isPending = item.status === 'pending';
+      
+      console.log('Checking habit:', {
+        id: item.id,
+        notes: item.notes,
+        type: item.type,
+        status: item.status,
+        isHabit,
+        isPending,
+        schedule: item.schedule
+      });
+      
+      return isHabit && isPending;
+    });
+    
+    console.log('Filtered active habits:', {
+      count: activeHabits.length,
+      habits: activeHabits.map(h => ({
+        id: h.id,
+        notes: h.notes,
+        schedule: h.schedule
+      }))
+    });
+    
+    return activeHabits;
   },
 
-  getTodayItems: () => {
+  getTodayItems: (date = new Date()) => {
     const { items } = get();
-    const today = new Date();
-    const todayStart = startOfDay(today);
-    const todayEnd = endOfDay(today);
+    const todayStart = startOfDay(date);
+    const todayEnd = endOfDay(date);
+    const dayOfWeek = date.getDay();
+
+    console.log('Getting items for:', {
+      date: date.toISOString(),
+      dayOfWeek,
+      totalItems: items.length
+    });
 
     return items.filter(item => {
-      if (item.status === 'completed') return false;
+      if (item.status === 'completed') {
+        console.log('Skipping completed item:', item.id);
+        return false;
+      }
 
       if (item.schedule) {
         const { schedules, repeat } = item.schedule;
-        const dayOfWeek = today.getDay();
+        
+        console.log('Checking item:', {
+          id: item.id,
+          notes: item.notes,
+          schedules,
+          repeat,
+          dayOfWeek
+        });
 
         return schedules.some(schedule => {
+          console.log('Checking schedule:', {
+            itemId: item.id,
+            scheduleDay: schedule.day,
+            currentDay: dayOfWeek,
+            dayMatches: schedule.day === dayOfWeek,
+            repeat
+          });
+
+          // If the day doesn't match, skip this schedule
           if (schedule.day !== dayOfWeek) return false;
 
-          if (repeat === 'daily') return true;
+          // If no repeat is set, treat it as a one-time schedule for this day
+          if (!repeat) return true;
 
-          if (repeat === 'weekly') {
-            if (!item.updatedAt) return true;
-            const lastUpdate = startOfDay(item.updatedAt);
-            const nextDue = addDays(lastUpdate, 7);
-            return today >= nextDue;
-          }
+          // For daily or weekly items, just check if the day matches
+          if (repeat === 'daily' || repeat === 'weekly') return true;
 
-          if (repeat === 'monthly') {
-            if (!item.updatedAt) return true;
+          // For monthly items, check if it's due
+          if (repeat === 'monthly' && item.updatedAt) {
             const lastUpdate = startOfDay(item.updatedAt);
             const nextDue = new Date(lastUpdate);
             nextDue.setMonth(nextDue.getMonth() + 1);
-            return today >= nextDue;
+            return date >= nextDue;
           }
 
-          return false;
+          return !item.updatedAt; // Show if never updated
         });
       }
 
@@ -415,13 +473,27 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
     });
   },
 
-  generateFromGoal: async (goal: Goal) => {
+  generateFromGoal: async (goal: Goal, scheduleDay = new Date().getDay()) => {
     try {
       const { addItem } = get();
+      
+      console.log('Generating items from goal:', {
+        goalId: goal.id,
+        goalName: goal.name,
+        scheduleDay,
+        trackedSteps: goal.steps.filter(step => step.isTracked).length
+      });
       
       const trackedSteps = goal.steps.filter(step => step.isTracked);
       
       for (const step of trackedSteps) {
+        console.log('Creating habit for step:', {
+          stepText: step.text,
+          scheduleDay,
+          isTracked: step.isTracked,
+          tasks: step.tasks?.length || 0
+        });
+
         const habitData: Omit<ItineraryItem, 'id' | 'createdAt' | 'updatedAt'> = {
           type: 'habit',
           referenceId: goal.id,
@@ -432,12 +504,18 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
           householdId: goal.householdId,
           schedule: {
             startDate: new Date(),
-            schedules: [{ day: new Date().getDay(), time: '09:00' }],
+            schedules: [{ day: scheduleDay, time: '09:00' }],
             repeat: 'weekly'
           }
         };
 
-        await addItem(habitData);
+        const itemId = await addItem(habitData);
+        console.log('Created habit item:', {
+          id: itemId,
+          scheduleDay,
+          text: step.text,
+          schedule: habitData.schedule
+        });
       }
     } catch (error) {
       console.error('Error generating habits from goal:', error);
