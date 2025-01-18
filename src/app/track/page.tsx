@@ -129,13 +129,13 @@ export default function TrackPage() {
                           
                           <div>
                             <div className="flex items-center space-x-2">
-                              <span className="font-medium">{goal?.name}</span>
-                              {item.notes && (
-                                <span className="text-sm text-muted-foreground">
-                                  - {item.notes}
-                                </span>
-                              )}
+                              <span className="text-sm text-muted-foreground">{goal?.name}</span>
                             </div>
+                            {item.notes && (
+                              <span className="font-medium">
+                                {item.notes}
+                              </span>
+                            )}
                             
                             {item.schedule?.repeat && (
                               <div className="text-sm text-muted-foreground">
