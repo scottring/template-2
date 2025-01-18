@@ -1,153 +1,119 @@
 'use client';
 
-import { format, addDays } from 'date-fns';
+import { useEffect } from 'react';
+import { motion } from 'framer-motion';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
 import useGoalStore from '@/lib/stores/useGoalStore';
-import { Goal, ItineraryItem, TimeScale } from '@/types/models';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { ArrowUpRight } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { CheckCircle2, Circle, ArrowUpRight } from 'lucide-react';
 
-interface HabitWithContext extends ItineraryItem {
-  goal?: Goal;
-  streak: number;
-  progress: {
-    completed: number;
-    total: number;
-    lastUpdatedAt: Date;
-  };
-  frequency: {
-    type: TimeScale;
-    value: number;
-  };
-}
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const item = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0 }
+};
 
 export function ActiveHabits() {
-  const router = useRouter();
   const { user } = useAuth();
-  const { getActiveHabits, getStreak } = useItineraryStore();
+  const { getActiveHabits, completeItem } = useItineraryStore();
   const { goals, fetchGoals } = useGoalStore();
-  const habits = getActiveHabits();
+  const activeHabits = getActiveHabits();
 
-  // Load goals on component mount
   useEffect(() => {
-    const householdId = user?.householdId;
-    if (!householdId) return;
-
-    const loadGoalsData = async () => {
-      try {
-        await fetchGoals(householdId);
-        console.log('Goals loaded:', goals.map(g => ({ id: g.id, name: g.name })));
-      } catch (error) {
-        console.error('Error loading goals:', error);
-      }
-    };
-    loadGoalsData();
-  }, [fetchGoals, user?.householdId]);
-
-  // Add goal context to each habit
-  const habitsWithContext: HabitWithContext[] = habits.map(habit => {
-    console.log('Processing habit:', { id: habit.id, referenceId: habit.referenceId });
-    const goal = goals.find((g: Goal) => g.id === habit.referenceId);
-    if (!goal) {
-      console.log('No goal found for referenceId:', habit.referenceId);
+    if (user?.householdId) {
+      fetchGoals(user.householdId);
     }
-    return {
-      ...habit,
-      goal,
-      streak: getStreak(habit.id),
-      progress: {
-        completed: 0, // TODO: Calculate from schedule/history
-        total: habit.schedule.repeat === 'daily' ? 1 : 
-               habit.schedule.repeat === 'weekly' ? 7 : 30,
-        lastUpdatedAt: habit.updatedAt
-      },
-      frequency: {
-        type: habit.schedule.repeat || 'weekly',
-        value: 1
-      }
-    };
-  });
+  }, [user?.householdId, fetchGoals]);
 
-  const handleHabitClick = (habit: HabitWithContext) => {
-    if (habit.goal?.id) {
-      console.log('Navigating to goal:', habit.goal.id);
-      router.push(`/goals/${habit.goal.id}`);
-    } else {
-      console.log('No goal found for habit:', { id: habit.id, referenceId: habit.referenceId });
-    }
+  const handleComplete = async (itemId: string) => {
+    if (!user) return;
+    await completeItem(itemId, user.uid);
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-lg font-semibold mb-4">Active Habits & Routines</h2>
-      <div className="space-y-6">
-        {habitsWithContext.map((habit) => (
-          <div 
-            key={habit.id} 
-            className="relative space-y-2 p-3 rounded-md hover:bg-gray-50 cursor-pointer group"
-            onClick={() => handleHabitClick(habit)}
-          >
-            {/* Goal Context - Always show at the top */}
-            {habit.goal ? (
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-blue-600 group-hover:text-blue-700">
-                  {habit.goal.name}
-                </p>
-                <ArrowUpRight className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">Unlinked Habit (ID: {habit.referenceId})</p>
-            )}
+    <motion.div
+      variants={container}
+      initial="hidden"
+      animate="show"
+      className="space-y-4"
+    >
+      {activeHabits.length === 0 ? (
+        <motion.p 
+          variants={item}
+          className="text-muted-foreground text-center py-8"
+        >
+          No active habits
+        </motion.p>
+      ) : (
+        <motion.div className="space-y-3" variants={container}>
+          {activeHabits.map(habit => {
+            const goal = goals.find(g => g.id === habit.referenceId);
+            
+            return (
+              <motion.div
+                key={habit.id}
+                variants={item}
+                layout
+                className="group flex items-center justify-between p-4 rounded-lg hover:bg-accent/5 transition-all duration-200 border border-transparent hover:border-accent/20"
+              >
+                <div className="flex items-center space-x-4">
+                  <button
+                    onClick={() => handleComplete(habit.id)}
+                    className="text-muted-foreground hover:text-primary transition-colors relative"
+                  >
+                    <div className="absolute inset-0 bg-primary/10 rounded-full scale-0 group-hover:scale-150 transition-transform duration-300 opacity-0 group-hover:opacity-100" />
+                    {habit.status === 'completed' ? (
+                      <CheckCircle2 className="w-5 h-5 transition-transform duration-200 hover:scale-110" />
+                    ) : (
+                      <Circle className="w-5 h-5 transition-transform duration-200 hover:scale-110" />
+                    )}
+                  </button>
 
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{habit.notes}</span>
-              <span className="text-sm text-orange-500">
-                🔥 {habit.streak} day streak
-              </span>
-            </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm font-medium text-muted-foreground/80 group-hover:text-muted-foreground transition-colors">
+                        {goal?.name}
+                      </span>
+                    </div>
+                    {habit.notes && (
+                      <span className="font-medium text-foreground/90 group-hover:text-foreground transition-colors">
+                        {habit.notes}
+                      </span>
+                    )}
+                    
+                    {habit.schedule?.repeat && (
+                      <div className="text-sm text-muted-foreground/70 group-hover:text-muted-foreground/90 transition-colors">
+                        Every {habit.schedule.repeat}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <span>
-                Progress: {habit.progress.completed}/{habit.progress.total} this {habit.frequency.type}
-              </span>
-            </div>
-
-            <div className="text-sm text-gray-500">
-              {habit.progress.completed < habit.progress.total ? (
-                <>
-                  Next: {habit.progress.total - habit.progress.completed} more {
-                    habit.frequency.type === 'daily' ? 'times today' :
-                    habit.frequency.type === 'weekly' ? 'times this week' :
-                    'times this month'
-                  }
-                </>
-              ) : (
-                <>
-                  Next: {format(addDays(habit.progress.lastUpdatedAt, 1), 'E, MMM d')}
-                </>
-              )}
-            </div>
-
-            {/* Progress bar */}
-            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-green-500 rounded-full transition-all duration-300"
-                style={{ 
-                  width: `${(habit.progress.completed / habit.progress.total) * 100}%`
-                }}
-              />
-            </div>
-          </div>
-        ))}
-
-        {habits.length === 0 && (
-          <p className="text-gray-500 text-sm">
-            No active habits or routines
-          </p>
-        )}
-      </div>
-    </div>
+                {goal && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => window.location.href = `/goals/${goal.id}`}
+                    className="text-muted-foreground/50 hover:text-primary transition-colors opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200"
+                  >
+                    <ArrowUpRight className="w-5 h-5" />
+                  </Button>
+                )}
+              </motion.div>
+            );
+          })}
+        </motion.div>
+      )}
+    </motion.div>
   );
 } 

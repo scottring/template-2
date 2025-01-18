@@ -17,6 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { WeeklySchedule } from '@/components/itinerary/WeeklySchedule';
 
 const container: Variants = {
   hidden: { opacity: 0 },
@@ -198,6 +199,18 @@ export default function TrackPage() {
           </CardHeader>
           <CardContent className="p-6">
             <UnscheduledTasks />
+          </CardContent>
+        </Card>
+
+        {/* Weekly Schedule */}
+        <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
+          <CardHeader className="border-b border-primary/5 bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5">
+            <CardTitle className="text-lg font-semibold bg-gradient-to-r from-primary via-accent-foreground to-primary bg-clip-text text-transparent">
+              This Week's Schedule
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <WeeklySchedule startDate={date} />
           </CardContent>
         </Card>
       </div>
