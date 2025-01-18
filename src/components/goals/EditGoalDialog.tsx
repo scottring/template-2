@@ -36,7 +36,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
     name: '',
     description: '',
     startDate: new Date(),
-    targetDate: new Date(),
+    targetDate: undefined as Date | undefined,
     successCriteria: [] as SuccessCriteria[],
     progress: 0,
     assignedTo: [] as string[],
@@ -204,13 +204,15 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                 />
               </div>
               <div>
-                <Label htmlFor="targetDate">Target Date</Label>
+                <Label htmlFor="targetDate">Target Date (Optional)</Label>
                 <Input
                   type="date"
                   id="targetDate"
-                  value={formData.targetDate.toISOString().split('T')[0]}
-                  onChange={(e) => setFormData(prev => ({ ...prev, targetDate: new Date(e.target.value) }))}
-                  required
+                  value={formData.targetDate?.toISOString().split('T')[0] || ''}
+                  onChange={(e) => setFormData(prev => ({ 
+                    ...prev, 
+                    targetDate: e.target.value ? new Date(e.target.value) : undefined 
+                  }))}
                 />
               </div>
             </div>

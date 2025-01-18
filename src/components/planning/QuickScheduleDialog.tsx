@@ -363,10 +363,11 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
+                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-sm">Target Date</Label>
+                <Label className="text-sm">Target Date (Optional)</Label>
                 <Input
                   type="date"
                   value={targetDate}
