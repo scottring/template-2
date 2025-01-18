@@ -12,7 +12,7 @@ import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon, ListTodo, StickyN
 import { UserSelect } from '@/components/shared/UserSelect';
 
 // Import shadcn components
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,6 +71,28 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
     }))
   });
 
+  useEffect(() => {
+    setFormData({
+      ...goal,
+      startDate: goal.startDate instanceof Date ? goal.startDate : new Date(),
+      targetDate: goal.targetDate instanceof Date ? goal.targetDate : new Date(new Date().setDate(new Date().getDate() + 7)),
+      steps: goal.steps.map(step => ({
+        ...step,
+        tasks: step.tasks || [],
+        notes: step.notes || [],
+        repeatEndDate: step.repeatEndDate instanceof Date ? step.repeatEndDate : 
+                      goal.targetDate instanceof Date ? goal.targetDate : 
+                      new Date(new Date().setDate(new Date().getDate() + 7)),
+        nextOccurrence: step.nextOccurrence instanceof Date ? step.nextOccurrence : 
+                       getNextOccurrence(
+                         goal.startDate instanceof Date ? goal.startDate : new Date(), 
+                         step.timescale || 'weekly'
+                       )
+      }))
+    });
+    setActiveStepIndex(null);
+  }, [goal]);
+
   const [activeStepIndex, setActiveStepIndex] = useState<number | null>(null);
 
   useEffect(() => {
@@ -88,6 +110,7 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
       const filteredSteps = formData.steps
         .filter(step => step.text.trim())
         .map((step: Step) => {
+          // Base step properties that both Tangible and Habit steps share
           const baseStep = {
             id: step.id,
             text: step.text.trim(),
@@ -102,17 +125,18 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
               id: note.id,
               text: note.text || '',
               timestamp: note.timestamp || new Date()
-            }))
+            })),
+            repeatEndDate: step.repeatEndDate instanceof Date ? step.repeatEndDate : undefined,
+            selectedDays: step.selectedDays || [],
+            scheduledTimes: step.scheduledTimes || {}
           };
 
+          // Add habit-specific properties only if it's a Habit type and isTracked
           if (step.isTracked && step.stepType === 'Habit') {
             return {
               ...baseStep,
               timescale: step.timescale || 'weekly',
               frequency: step.frequency || 1,
-              selectedDays: step.selectedDays || [],
-              scheduledTimes: step.scheduledTimes || {},
-              repeatEndDate: step.repeatEndDate || formData.targetDate,
               nextOccurrence: getNextOccurrence(formData.startDate, step.timescale || 'weekly')
             };
           }
@@ -120,11 +144,14 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
           return baseStep;
         });
 
-      await updateGoal(goal.id, {
-        ...goal,
+      const updatedGoal = {
         ...formData,
-        steps: filteredSteps
-      });
+        steps: filteredSteps,
+        updatedAt: new Date()
+      };
+
+      console.log('Saving goal with steps:', updatedGoal.steps);
+      await updateGoal(goal.id, updatedGoal);
       
       onClose();
     } catch (error) {
@@ -161,10 +188,24 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
   const updateStep = (index: number, updates: Partial<Step>) => {
     setFormData(prev => ({
       ...prev,
-      steps: prev.steps.map((s, i) =>
-        i === index ? { ...s, ...updates } : s
-      )
+      steps: prev.steps.map((s, i) => {
+        if (i !== index) return s;
+        
+        // Create the updated step
+        const updatedStep = { ...s, ...updates };
+        
+        // If changing from Habit to Tangible, remove only habit-specific fields
+        if (updates.stepType === 'Tangible') {
+          delete updatedStep.timescale;
+          delete updatedStep.frequency;
+          delete updatedStep.nextOccurrence;
+          // Keep selectedDays and scheduledTimes as they apply to both types
+        }
+        
+        return updatedStep;
+      })
     }));
+    console.log('Step updated:', index, updates);
   };
 
   return (
@@ -172,6 +213,9 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">Edit Goal</DialogTitle>
+          <DialogDescription>
+            Make changes to your goal and its steps. Click save when you're done.
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -323,7 +367,27 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
                       <Label className="text-sm font-medium text-gray-700">Step Type</Label>
                       <Select
                         value={step.stepType}
-                        onValueChange={(value: GoalType) => updateStep(index, { stepType: value })}
+                        onValueChange={(value: GoalType) => {
+                          // When changing to Tangible, preserve the base fields but remove habit-specific ones
+                          if (value === 'Tangible') {
+                            const { timescale, frequency, selectedDays, scheduledTimes, nextOccurrence, ...baseStep } = step;
+                            updateStep(index, { ...baseStep, stepType: value });
+                          } else {
+                            // When changing to Habit, keep existing data
+                            updateStep(index, { 
+                              ...step,
+                              stepType: value,
+                              // Only add habit fields if it's tracked
+                              ...(step.isTracked ? {
+                                timescale: step.timescale || 'weekly',
+                                frequency: step.frequency || 1,
+                                selectedDays: step.selectedDays || [],
+                                scheduledTimes: step.scheduledTimes || {},
+                                repeatEndDate: step.repeatEndDate || formData.targetDate
+                              } : {})
+                            });
+                          }
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -342,9 +406,13 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
                           checked={step.isTracked}
                           onChange={(e) => updateStep(index, { 
                             isTracked: e.target.checked,
-                            timescale: e.target.checked && step.stepType === 'Habit' ? 'weekly' : undefined,
-                            frequency: e.target.checked && step.stepType === 'Habit' ? 1 : undefined,
-                            repeatEndDate: e.target.checked && step.stepType === 'Habit' ? formData.targetDate : undefined
+                            ...(e.target.checked && step.stepType === 'Habit' ? {
+                              timescale: step.timescale || 'weekly',
+                              frequency: step.frequency || 1,
+                              selectedDays: step.selectedDays || [],
+                              scheduledTimes: step.scheduledTimes || {},
+                              repeatEndDate: step.repeatEndDate || formData.targetDate
+                            } : {})
                           })}
                           className="h-4 w-4 rounded border-gray-300"
                         />

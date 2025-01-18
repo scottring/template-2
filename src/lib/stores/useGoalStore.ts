@@ -43,11 +43,12 @@ const convertFirestoreTimestamps = (data: DocumentData): Partial<Goal> => {
     updatedAt: data.updatedAt?.toDate(),
     startDate: data.startDate?.toDate(),
     targetDate: data.targetDate?.toDate(),
-    successCriteria: data.successCriteria?.map((c: any) => ({
-      ...c,
-      nextOccurrence: c.nextOccurrence?.toDate(),
-      tasks: c.tasks || [],
-      notes: c.notes || []
+    steps: data.steps?.map((step: any) => ({
+      ...step,
+      nextOccurrence: step.nextOccurrence?.toDate(),
+      repeatEndDate: step.repeatEndDate?.toDate(),
+      tasks: step.tasks || [],
+      notes: step.notes || []
     })) || []
   };
 };
@@ -144,21 +145,51 @@ const useGoalStore = create<GoalStore>((set, get) => ({
   addGoal: async (goal: Partial<Goal>) => {
     set({ loading: true, error: null });
     try {
-      const docRef = await addDoc(collection(db, 'goals'), {
-        ...goal,
-        successCriteria: goal.successCriteria?.map(c => ({
-          ...c,
-          nextOccurrence: c.nextOccurrence ? Timestamp.fromDate(c.nextOccurrence) : null,
-          tasks: c.tasks || [],
-          notes: c.notes || []
-        })) || [],
-        startDate: goal.startDate ? Timestamp.fromDate(goal.startDate) : null,
+      // Ensure we have required fields
+      if (!goal.householdId) {
+        throw new Error('householdId is required');
+      }
+
+      // Clean and validate all fields before sending to Firestore
+      const cleanGoal = {
+        householdId: goal.householdId,
+        name: goal.name || '',
+        description: goal.description || '',
+        goalType: goal.goalType || 'Tangible',
+        areaId: goal.areaId || '',
+        assignedTo: goal.assignedTo || [],
+        status: goal.status || 'not_started',
+        progress: goal.progress || 0,
+        startDate: goal.startDate ? Timestamp.fromDate(goal.startDate) : Timestamp.fromDate(new Date()),
         targetDate: goal.targetDate ? Timestamp.fromDate(goal.targetDate) : null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        progress: goal.progress || 0,
-        status: goal.status || 'not_started'
-      });
+        steps: (goal.steps || []).map(step => ({
+          id: step.id || crypto.randomUUID(),
+          text: step.text || '',
+          stepType: step.stepType || 'Tangible',
+          isTracked: Boolean(step.isTracked),
+          tasks: (step.tasks || []).map(task => ({
+            id: task.id || crypto.randomUUID(),
+            text: task.text || '',
+            completed: Boolean(task.completed)
+          })),
+          notes: (step.notes || []).map(note => ({
+            id: note.id || crypto.randomUUID(),
+            text: note.text || '',
+            timestamp: note.timestamp ? Timestamp.fromDate(note.timestamp) : serverTimestamp()
+          })),
+          selectedDays: step.selectedDays || [],
+          scheduledTimes: step.scheduledTimes || {},
+          frequency: step.frequency || 1,
+          timescale: step.timescale || 'weekly',
+          nextOccurrence: step.nextOccurrence ? Timestamp.fromDate(step.nextOccurrence) : null,
+          repeatEndDate: step.repeatEndDate ? Timestamp.fromDate(step.repeatEndDate) : null
+        }))
+      };
+
+      console.log('Adding goal with data:', cleanGoal);
+      const docRef = await addDoc(collection(db, 'goals'), cleanGoal);
       
       const docSnap = await getDoc(docRef);
       const data = docSnap.data();
@@ -188,14 +219,31 @@ const useGoalStore = create<GoalStore>((set, get) => ({
         updatedAt: serverTimestamp(),
         startDate: updates.startDate ? Timestamp.fromDate(updates.startDate) : undefined,
         targetDate: updates.targetDate ? Timestamp.fromDate(updates.targetDate) : undefined,
-        successCriteria: updates.successCriteria?.map(c => ({
-          ...c,
-          nextOccurrence: c.nextOccurrence ? Timestamp.fromDate(c.nextOccurrence) : null,
-          tasks: c.tasks || [],
-          notes: c.notes || []
+        steps: updates.steps?.map(step => ({
+          id: step.id,
+          text: step.text || '',
+          stepType: step.stepType || 'Tangible',
+          isTracked: Boolean(step.isTracked),
+          tasks: (step.tasks || []).map(task => ({
+            id: task.id,
+            text: task.text || '',
+            completed: Boolean(task.completed)
+          })),
+          notes: (step.notes || []).map(note => ({
+            id: note.id,
+            text: note.text || '',
+            timestamp: note.timestamp ? Timestamp.fromDate(note.timestamp) : serverTimestamp()
+          })),
+          selectedDays: step.selectedDays || [],
+          scheduledTimes: step.scheduledTimes || {},
+          frequency: step.frequency || 1,
+          timescale: step.timescale || 'weekly',
+          nextOccurrence: step.nextOccurrence ? Timestamp.fromDate(step.nextOccurrence) : null,
+          repeatEndDate: step.repeatEndDate ? Timestamp.fromDate(step.repeatEndDate) : null
         }))
       };
       
+      console.log('Updating goal with data:', updateData);
       await updateDoc(doc(db, 'goals', goalId), updateData);
       const docSnap = await getDoc(doc(db, 'goals', goalId));
       const data = docSnap.data();
