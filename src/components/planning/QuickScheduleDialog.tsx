@@ -21,7 +21,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { PlusCircle, X, ListTodo, StickyNote } from 'lucide-react';
-import { TimeScale, Area, SuccessCriteria, GoalType } from '@/types/models';
+import { TimeScale, Area, Step, GoalType } from '@/types/models';
 import useAreaStore from '@/lib/stores/useAreaStore';
 import useGoalStore from '@/lib/stores/useGoalStore';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
@@ -378,14 +378,14 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
           </div>
 
           <div className="space-y-4">
-            <Label>Success Criteria</Label>
+            <Label>Steps</Label>
 
             {criteria.map((criterion, index) => (
               <Card key={index} className="p-4 space-y-4">
                 <div className="flex items-start gap-2">
                   <div className="flex-1">
                     <Input
-                      placeholder="Enter success criteria"
+                      placeholder="Enter step"
                       value={criterion.text}
                       onChange={(e) =>
                         handleUpdateCriteria(index, { text: e.target.value })
@@ -592,7 +592,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
               className="w-full"
             >
               <PlusCircle className="w-4 h-4 mr-2" />
-              Add Criteria
+              Add Step
             </Button>
           </div>
         </div>

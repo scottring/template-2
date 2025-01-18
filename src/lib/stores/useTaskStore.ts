@@ -15,7 +15,7 @@ import {
   Unsubscribe
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
-import { Task, TaskCategory, Goal, SuccessCriteria } from '@/types/models';
+import { Task, TaskCategory, Goal, Step } from '@/types/models';
 import useGoalStore from '@/lib/stores/useGoalStore';
 
 interface TaskStore {
@@ -138,7 +138,7 @@ const useTaskStore = create<TaskStore>((set, get) => ({
         const goal = goalStore.goals.find((g: Goal) => g.id === task.goalId);
         
         if (goal) {
-          const updatedCriteria = goal.successCriteria?.map((c: SuccessCriteria) => {
+          const updatedCriteria = goal.successCriteria?.map((c: Step) => {
             if (c.id === task.criteriaId) {
               return {
                 ...c,
