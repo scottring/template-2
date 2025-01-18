@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { ItineraryItem, Schedule, TimeScale, Goal } from '@/types/models';
 import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where, getDoc, setDoc, writeBatch, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
-import { startOfDay, endOfDay, addDays, isSameDay, isWithinInterval } from 'date-fns';
+import { startOfDay, endOfDay, addDays, isSameDay, isWithinInterval, isBefore } from 'date-fns';
 
 interface ItineraryStore {
   items: ItineraryItem[];
@@ -268,6 +268,9 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
 
   getActiveHabits: () => {
     const { items } = get();
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    
     console.log('Getting active habits:', {
       totalItems: items.length,
       habits: items.filter(item => item.type === 'habit').map(h => ({
@@ -279,20 +282,27 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
     });
     
     const activeHabits = items.filter(item => {
+      // Must be a habit and not completed
       const isHabit = item.type === 'habit';
       const isPending = item.status === 'pending';
-      
-      console.log('Checking habit:', {
-        id: item.id,
-        notes: item.notes,
-        type: item.type,
-        status: item.status,
-        isHabit,
-        isPending,
-        schedule: item.schedule
-      });
-      
-      return isHabit && isPending;
+      if (!isHabit || !isPending) return false;
+
+      // Must have a schedule
+      if (!item.schedule) return false;
+      const { schedules, repeat, startDate, endDate } = item.schedule;
+
+      // Skip if start date is in the future
+      if (startDate && isBefore(today, startDate)) {
+        return false;
+      }
+
+      // Skip if end date is in the past
+      if (endDate && isBefore(endDate, today)) {
+        return false;
+      }
+
+      // Check if scheduled for today
+      return schedules.some(schedule => schedule.day === dayOfWeek);
     });
     
     console.log('Filtered active habits:', {
@@ -320,53 +330,63 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
     });
 
     return items.filter(item => {
+      // Skip completed items
       if (item.status === 'completed') {
         console.log('Skipping completed item:', item.id);
         return false;
       }
 
-      if (item.schedule) {
-        const { schedules, repeat } = item.schedule;
-        
-        console.log('Checking item:', {
-          id: item.id,
-          notes: item.notes,
-          schedules,
-          repeat,
-          dayOfWeek
-        });
+      // If no schedule, skip
+      if (!item.schedule) return false;
 
-        return schedules.some(schedule => {
-          console.log('Checking schedule:', {
-            itemId: item.id,
-            scheduleDay: schedule.day,
-            currentDay: dayOfWeek,
-            dayMatches: schedule.day === dayOfWeek,
-            repeat
-          });
-
-          // If the day doesn't match, skip this schedule
-          if (schedule.day !== dayOfWeek) return false;
-
-          // If no repeat is set, treat it as a one-time schedule for this day
-          if (!repeat) return true;
-
-          // For daily or weekly items, just check if the day matches
-          if (repeat === 'daily' || repeat === 'weekly') return true;
-
-          // For monthly items, check if it's due
-          if (repeat === 'monthly' && item.updatedAt) {
-            const lastUpdate = startOfDay(item.updatedAt);
-            const nextDue = new Date(lastUpdate);
-            nextDue.setMonth(nextDue.getMonth() + 1);
-            return date >= nextDue;
-          }
-
-          return !item.updatedAt; // Show if never updated
-        });
+      const { schedules, repeat, startDate } = item.schedule;
+      
+      // Skip if start date is in the future
+      if (startDate && isBefore(date, startDate)) {
+        return false;
       }
 
-      return false;
+      // Skip if end date is in the past
+      if (item.schedule.endDate && isBefore(item.schedule.endDate, date)) {
+        return false;
+      }
+
+      // Check if any schedule matches today
+      return schedules.some(schedule => {
+        // If day doesn't match, skip
+        if (schedule.day !== dayOfWeek) return false;
+
+        // If no repeat, only show on the exact date
+        if (!repeat) {
+          return isSameDay(startDate, date);
+        }
+
+        // For repeating items, check if they're due
+        if (item.updatedAt) {
+          const lastUpdate = startOfDay(item.updatedAt);
+          let nextDue;
+
+          switch (repeat) {
+            case 'daily':
+              nextDue = addDays(lastUpdate, 1);
+              break;
+            case 'weekly':
+              nextDue = addDays(lastUpdate, 7);
+              break;
+            case 'monthly':
+              nextDue = new Date(lastUpdate);
+              nextDue.setMonth(nextDue.getMonth() + 1);
+              break;
+            default:
+              return true;
+          }
+
+          return date >= nextDue;
+        }
+
+        // If never updated, always show
+        return true;
+      });
     });
   },
 

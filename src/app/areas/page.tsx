@@ -8,13 +8,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import useAreaStore from '@/lib/stores/useAreaStore';
-import { Area } from '@/types/models';
+import useGoalStore from '@/lib/stores/useGoalStore';
+import { Area, Goal } from '@/types/models';
 import { CreateAreaDialog } from '@/components/areas/CreateAreaDialog';
 import { EditAreaDialog } from '@/components/areas/EditAreaDialog';
+import { cn } from '@/lib/utils';
 
 export default function AreasPage() {
   const { user } = useAuth();
   const { areas, loading, error, fetchAreas, deleteArea } = useAreaStore();
+  const goals = useGoalStore((state: { goals: Goal[] }) => state.goals);
   const [selectedArea, setSelectedArea] = useState<Area | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
@@ -132,7 +135,37 @@ export default function AreasPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-500 mb-4">{area.description || 'No description'}</p>
-                <div className="flex flex-wrap gap-2">
+                
+                {/* Active Goals Section */}
+                <div className="space-y-2">
+                  {goals.filter((goal: Goal) => goal.areaId === area.id && goal.status !== 'completed').map((goal: Goal) => (
+                    <div 
+                      key={goal.id}
+                      className="flex items-center justify-between p-2 rounded-lg bg-accent/5 hover:bg-accent/10 transition-colors"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {goal.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {goal.description}
+                        </p>
+                      </div>
+                      <Badge 
+                        variant="secondary" 
+                        className={cn(
+                          "ml-2",
+                          goal.status === 'in_progress' && "bg-primary/10 text-primary hover:bg-primary/20",
+                          goal.status === 'not_started' && "bg-gray-100 text-gray-500"
+                        )}
+                      >
+                        {goal.status === 'in_progress' ? 'In Progress' : 'Not Started'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap gap-2 mt-4">
                   {area.isFocus && (
                     <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
                       Focus Area
