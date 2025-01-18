@@ -84,7 +84,14 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="text-2xl font-semibold">{goal.name}</h1>
+            <div className="flex items-center gap-x-3">
+              <h1 className="text-2xl font-semibold">{goal.name}</h1>
+              <span className={`px-2 py-1 text-sm rounded ${
+                goal.goalType === 'Habit' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+              }`}>
+                {goal.goalType}
+              </span>
+            </div>
             <div className="flex items-center gap-x-2 text-sm text-gray-500">
               <Calendar className="h-4 w-4" />
               <span>Due {goal.targetDate?.toLocaleDateString()}</span>

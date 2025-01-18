@@ -71,6 +71,8 @@ export interface Task extends BaseItem {
   notes: Note[];
 }
 
+export type GoalType = 'Habit' | 'Tangible';
+
 export interface Goal extends BaseItem {
   name: string;
   description: string;
@@ -78,6 +80,7 @@ export interface Goal extends BaseItem {
   startDate: Date;
   targetDate: Date;
   progress: number;
+  goalType: GoalType;
   status: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
   successCriteria: SuccessCriteria[];
   assignedTo: string[];
