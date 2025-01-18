@@ -78,7 +78,7 @@ export interface Goal extends BaseItem {
   description: string;
   areaId: string;
   startDate: Date;
-  targetDate: Date;
+  targetDate?: Date;
   progress: number;
   goalType: GoalType;
   status: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
