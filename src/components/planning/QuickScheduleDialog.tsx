@@ -21,7 +21,7 @@ import {
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { PlusCircle, X, ListTodo, StickyNote } from 'lucide-react';
-import { TimeScale, Area, SuccessCriteria } from '@/types/models';
+import { TimeScale, Area, SuccessCriteria, GoalType } from '@/types/models';
 import useAreaStore from '@/lib/stores/useAreaStore';
 import useGoalStore from '@/lib/stores/useGoalStore';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
@@ -75,6 +75,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
   const [newAreaName, setNewAreaName] = useState('');
   const [goalName, setGoalName] = useState('');
   const [goalDescription, setGoalDescription] = useState('');
+  const [goalType, setGoalType] = useState<GoalType>('Tangible');
   const [criteria, setCriteria] = useState<SuccessCriteriaInput[]>([{ 
     text: '', 
     isTracked: false,
@@ -203,132 +204,158 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
   const handleSubmit = async () => {
     if (!user?.householdId) return;
 
-    let areaId = selectedArea;
-    
-    if (selectedArea === 'new' && newAreaName) {
-      areaId = await addArea({
-        name: newAreaName,
-        description: '',
-        color: '#000000',
-        icon: 'folder',
-        householdId: user.householdId,
-        isActive: true,
-        isFocus: false,
+    try {
+      let areaId = selectedArea;
+      
+      // Create new area if needed
+      if (selectedArea === 'new' && newAreaName) {
+        areaId = await addArea({
+          name: newAreaName,
+          description: '',
+          color: '#000000',
+          icon: 'folder',
+          householdId: user.householdId,
+          isActive: true,
+          isFocus: false,
+          assignedTo: [user.uid],
+        });
+      }
+
+      // Create the goal
+      const goalResult = await addGoal({
+        name: goalName,
+        description: goalDescription,
+        areaId,
+        goalType,
+        startDate: new Date(startDate),
+        targetDate: targetDate ? new Date(targetDate) : undefined,
+        successCriteria: criteria.filter(c => c.text.trim()).map(c => ({
+          id: crypto.randomUUID(),
+          ...c
+        })),
+        status: 'not_started',
+        progress: 0,
         assignedTo: [user.uid],
+        householdId: user.householdId,
       });
+
+      // Create itinerary items for tracked criteria
+      for (const criterion of criteria.filter(c => c.isTracked)) {
+        if (!criterion.text || !criterion.timescale || !criterion.frequency) continue;
+
+        await addItem({
+          type: 'task',
+          referenceId: goalResult,
+          criteriaId: criterion.text,
+          schedule: {
+            startDate: new Date(startDate),
+            endDate: targetDate ? new Date(targetDate) : undefined,
+            repeat: criterion.timescale,
+            schedules: scheduleTimes.map(st => ({
+              day: st.day,
+              time: st.time
+            }))
+          },
+          status: 'pending',
+          notes: '',
+          householdId: user.householdId,
+          createdBy: user.uid,
+          updatedBy: user.uid
+        });
+      }
+
+      // Reset form
+      setSelectedArea('');
+      setNewAreaName('');
+      setGoalName('');
+      setGoalDescription('');
+      setCriteria([{ 
+        text: '', 
+        isTracked: false,
+        tasks: [],
+        notes: []
+      }]);
+      setSelectedDays([]);
+      setScheduleTimes([]);
+      setRepeat('weekly');
+      setTargetDate('');
+      setStartDate(new Date().toISOString().split('T')[0]);
+      onClose();
+    } catch (error) {
+      console.error('Error creating goal:', error);
     }
-
-    const goalId = await addGoal({
-      name: goalName,
-      description: goalDescription,
-      areaId,
-      householdId: user.householdId,
-      startDate: new Date(startDate),
-      targetDate: targetDate ? new Date(targetDate) : undefined,
-      progress: 0,
-      status: 'not_started',
-      successCriteria: criteria.map(c => ({
-        id: crypto.randomUUID(),
-        text: c.text,
-        isTracked: c.isTracked,
-        frequency: c.frequency,
-        timescale: c.timescale,
-        tasks: c.tasks,
-        notes: c.notes
-      })),
-      assignedTo: [user.uid]
-    });
-
-    // Schedule tracked criteria
-    const trackedCriteria = criteria.filter(c => c.isTracked);
-    
-    for (const criterion of trackedCriteria) {
-      await addItem({
-        type: 'task',
-        referenceId: goalId,
-        criteriaId: criterion.text,
-        schedule: {
-          startDate: new Date(),
-          schedules: scheduleTimes,
-          repeat: repeat === 'none' ? undefined : repeat,
-        },
-        status: 'pending',
-        notes: criterion.text,
-        createdBy: user.uid,
-        updatedBy: user.uid,
-        householdId: user.householdId ?? ''
-      });
-    }
-
-    // Reset form
-    setSelectedArea('');
-    setNewAreaName('');
-    setGoalName('');
-    setGoalDescription('');
-    setCriteria([{ 
-      text: '', 
-      isTracked: false,
-      tasks: [],
-      notes: []
-    }]);
-    setSelectedDays([]);
-    setScheduleTimes([]);
-    setRepeat('weekly');
-    setTargetDate('');
-    setStartDate(new Date().toISOString().split('T')[0]);
-    onClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Quick Schedule</DialogTitle>
+          <DialogTitle>Quick Schedule Goal</DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-6 py-4">
-          <div className="space-y-2">
-            <Label>Area</Label>
-            <Select
-              value={selectedArea}
-              onValueChange={setSelectedArea}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select an area" />
-              </SelectTrigger>
-              <SelectContent>
-                {areas.map(area => (
-                  <SelectItem key={area.id} value={area.id}>
-                    {area.name}
-                  </SelectItem>
-                ))}
-                <SelectItem value="new">+ Create New Area</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <Label>Area</Label>
+              <Select value={selectedArea} onValueChange={setSelectedArea}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select an area" />
+                </SelectTrigger>
+                <SelectContent>
+                  {areas.map(area => (
+                    <SelectItem key={area.id} value={area.id}>
+                      {area.name}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="new">+ Create New Area</SelectItem>
+                </SelectContent>
+              </Select>
 
-            {selectedArea === 'new' && (
+              {selectedArea === 'new' && (
+                <Input
+                  placeholder="New area name"
+                  value={newAreaName}
+                  onChange={(e) => setNewAreaName(e.target.value)}
+                  className="mt-2"
+                />
+              )}
+            </div>
+
+            <div>
+              <Label>Goal Name</Label>
               <Input
-                placeholder="New area name"
-                value={newAreaName}
-                onChange={(e) => setNewAreaName(e.target.value)}
-                className="mt-2"
+                value={goalName}
+                onChange={(e) => setGoalName(e.target.value)}
+                placeholder="Enter goal name"
               />
-            )}
-          </div>
+            </div>
 
-          <div className="space-y-2">
-            <Label>Goal</Label>
-            <Input
-              placeholder="Goal name"
-              value={goalName}
-              onChange={(e) => setGoalName(e.target.value)}
-            />
-            <Textarea
-              placeholder="Goal description (optional)"
-              value={goalDescription}
-              onChange={(e) => setGoalDescription(e.target.value)}
-              rows={2}
-            />
+            <div>
+              <Label>Goal Type</Label>
+              <Select
+                value={goalType}
+                onValueChange={(value: GoalType) => setGoalType(value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select goal type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Habit">Habit</SelectItem>
+                  <SelectItem value="Tangible">Tangible</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                value={goalDescription}
+                onChange={(e) => setGoalDescription(e.target.value)}
+                placeholder="Enter goal description"
+                rows={3}
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4 mt-2">
               <div className="space-y-2">
                 <Label className="text-sm">Start Date</Label>

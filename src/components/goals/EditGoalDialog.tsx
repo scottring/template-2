@@ -5,7 +5,7 @@ import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon, ListTodo, StickyN
 import useGoalStore from '@/lib/stores/useGoalStore';
 import { useUserStore } from '@/lib/stores/useUserStore';
 import { UserSelect } from '@/components/shared/UserSelect';
-import { Goal, SuccessCriteria } from '@/types/models';
+import { Goal, SuccessCriteria, GoalType } from '@/types/models';
 import { getNextOccurrence } from '@/lib/utils/itineraryGeneration';
 import useTaskStore from '@/lib/stores/useTaskStore';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 interface EditGoalDialogProps {
   goal: Goal;
@@ -40,6 +41,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
     progress: 0,
     assignedTo: [] as string[],
     householdId: '',
+    goalType: 'Tangible' as GoalType
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -154,14 +156,30 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
         
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="name">Name</Label>
+            <div className="space-y-2">
+              <Label htmlFor="name">Goal Name</Label>
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                required
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Enter goal name"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="goalType">Goal Type</Label>
+              <Select
+                value={formData.goalType}
+                onValueChange={(value: GoalType) => setFormData({ ...formData, goalType: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select goal type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Habit">Habit</SelectItem>
+                  <SelectItem value="Tangible">Tangible</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

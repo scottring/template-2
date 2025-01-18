@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Fragment } from 'react';
 import { addMonths } from 'date-fns';
-import { Goal, TimeScale } from '@/types/models';
+import { Goal, TimeScale, GoalType } from '@/types/models';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
 import useGoalStore from '@/lib/stores/useGoalStore';
 import { useUserStore } from '@/lib/stores/useUserStore';
@@ -61,6 +61,7 @@ interface FormData {
   successCriteria: SuccessCriteriaInput[];
   assignedTo: string[];
   householdId: string;
+  goalType: GoalType;
 }
 
 export function CreateGoalDialog({ open, onClose }: CreateGoalDialogProps) {
@@ -90,7 +91,8 @@ export function CreateGoalDialog({ open, onClose }: CreateGoalDialogProps) {
       notes: []
     }],
     assignedTo: [],
-    householdId: user?.householdId || ''
+    householdId: user?.householdId || '',
+    goalType: 'Tangible'
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -138,7 +140,8 @@ export function CreateGoalDialog({ open, onClose }: CreateGoalDialogProps) {
           notes: []
         }],
         assignedTo: [],
-        householdId: user.householdId
+        householdId: user.householdId,
+        goalType: 'Tangible'
       });
       setSelectedArea('');
       setNewAreaName('');
@@ -219,14 +222,30 @@ export function CreateGoalDialog({ open, onClose }: CreateGoalDialogProps) {
               )}
             </div>
 
-            <div>
-              <Label htmlFor="name">Name</Label>
+            <div className="space-y-2">
+              <Label htmlFor="name">Goal Name</Label>
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                required
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Enter goal name"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="goalType">Goal Type</Label>
+              <Select
+                value={formData.goalType}
+                onValueChange={(value: GoalType) => setFormData({ ...formData, goalType: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select goal type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Habit">Habit</SelectItem>
+                  <SelectItem value="Tangible">Tangible</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

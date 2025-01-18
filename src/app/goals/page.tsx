@@ -98,68 +98,49 @@ export default function GoalsPage() {
 
       {goals.length === 0 ? (
         <div className="text-center py-12">
-          <h3 className="mt-2 text-sm font-semibold text-gray-900">No goals</h3>
-          <p className="mt-1 text-sm text-gray-500">Get started by creating a new goal.</p>
-          <div className="mt-6">
-            <button
-              onClick={() => setIsCreateDialogOpen(true)}
-              className="inline-flex items-center gap-x-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-            >
-              <PlusIcon className="-ml-0.5 h-5 w-5" aria-hidden="true" />
-              New Goal
-            </button>
-          </div>
+          <p className="text-gray-500">No goals yet. Create your first goal!</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {goals.map((goal: Goal) => (
+        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+          {goals.map((goal) => (
             <div
               key={goal.id}
-              className="relative flex flex-col overflow-hidden rounded-lg border bg-white shadow-sm"
+              className="relative group bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => router.push(`/goals/${goal.id}`)}
             >
-              <div className="p-6">
-                <div className="flex items-center gap-x-3">
-                  <h3 className="text-lg font-semibold">{goal.name}</h3>
-                  <SharedIndicator sharedWith={goal.assignedTo} />
-                </div>
-                <p className="mt-2 text-sm text-gray-600">{goal.description}</p>
-                <div className="mt-4">
-                  <div className="relative h-2 overflow-hidden rounded-full bg-gray-200">
-                    <div
-                      className="absolute inset-y-0 left-0 bg-blue-600 transition-all duration-300"
-                      style={{ width: `${goal.progress}%` }}
-                    />
-                  </div>
-                  <p className="mt-2 text-sm text-gray-600">
-                    {goal.progress}% complete
-                  </p>
-                </div>
-              </div>
-              <div className="mt-auto flex divide-x border-t">
+              <div className="absolute top-4 right-4 flex gap-2">
+                <SharedIndicator sharedWith={goal.assignedTo} />
                 <button
-                  type="button"
-                  onClick={() => router.push(`/goals/${goal.id}`)}
-                  className="flex w-full items-center justify-center gap-x-2.5 p-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSharingGoal(goal);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                 >
-                  View Details
+                  <Share2 className="h-4 w-4 text-gray-500" />
                 </button>
                 <button
-                  type="button"
-                  onClick={() => setSharingGoal(goal)}
-                  className="flex w-full items-center justify-center gap-x-2.5 p-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteGoal(goal.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                 >
-                  <Share2 className="h-4 w-4" />
-                  Share
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteGoal(goal.id)}
-                  className="flex w-full items-center justify-center gap-x-2.5 p-3 text-sm font-semibold text-red-600 hover:bg-red-50"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete
+                  <Trash2 className="h-4 w-4 text-red-500" />
                 </button>
               </div>
+              <h3 className="text-lg font-semibold mb-2">{goal.name}</h3>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`px-2 py-1 text-xs rounded ${
+                  goal.goalType === 'Habit' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {goal.goalType}
+                </span>
+                <span className="text-sm text-gray-500">
+                  Progress: {goal.progress}%
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">{goal.description}</p>
             </div>
           ))}
         </div>
@@ -168,7 +149,6 @@ export default function GoalsPage() {
       <CreateGoalDialog
         open={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
-        areaId=""
       />
 
       {sharingGoal && (
