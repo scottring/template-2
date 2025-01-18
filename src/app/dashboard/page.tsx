@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { motion, Variants } from "framer-motion";
 import { ItineraryItem, Step, Goal } from "@/types/models";
+import { useJourneyStore } from '@/lib/stores/useJourneyStore';
+import { useRouter } from 'next/navigation';
 
 const container: Variants = {
   hidden: { opacity: 0 },
@@ -52,6 +54,8 @@ export default function DashboardPage() {
   const [selectedItem, setSelectedItem] = useState<ItineraryItem | null>(null);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const router = useRouter();
+  const { isWeeklyReviewNeeded } = useJourneyStore();
 
   useEffect(() => {
     if (user?.householdId) {
@@ -60,6 +64,12 @@ export default function DashboardPage() {
       fetchGoals(user.householdId);
     }
   }, [user?.householdId, loadItems, fetchGoals]);
+
+  useEffect(() => {
+    if (isWeeklyReviewNeeded()) {
+      router.push('/review');
+    }
+  }, [isWeeklyReviewNeeded, router]);
 
   // Filter items that are scheduled for today or are unfinished tangible steps
   const todayItems = useMemo(() => {
