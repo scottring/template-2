@@ -20,7 +20,8 @@ import {
   CalendarDays,
   CalendarRange,
   CalendarClock,
-  LucideIcon
+  LucideIcon,
+  Folder
 } from 'lucide-react';
 import { motion, Variants } from 'framer-motion';
 
@@ -43,6 +44,7 @@ type NavItem = NavItemWithHref | NavItemWithChildren;
 
 const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Areas', href: '/areas', icon: Folder },
   { name: 'Goals', href: '/goals', icon: Target },
   { name: 'Track', href: '/track', icon: ClipboardList },
   { name: 'Review & Plan', href: '/review', icon: CalendarDays },

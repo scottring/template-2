@@ -41,6 +41,8 @@ interface StepInput {
   isTracked: boolean;
   timescale?: TimeScale;
   frequency?: number;
+  startDateTime?: Date;
+  endDateTime?: Date;
   nextOccurrence?: Date;
   repeatEndDate?: Date;
   selectedDays?: string[];
@@ -114,6 +116,9 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
       text: '',
       stepType: 'Tangible',
       isTracked: false,
+      startDateTime: new Date(),
+      endDateTime: undefined,
+      repeatEndDate: undefined,
       tasks: [],
       notes: []
     }],
@@ -219,6 +224,9 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
           text: '',
           stepType: 'Tangible',
           isTracked: false,
+          startDateTime: new Date(),
+          endDateTime: undefined,
+          repeatEndDate: undefined,
           tasks: [],
           notes: []
         }],
@@ -245,6 +253,9 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
           text: '',
           stepType: 'Tangible',
           isTracked: false,
+          startDateTime: new Date(),
+          endDateTime: undefined,
+          repeatEndDate: undefined,
           tasks: [],
           notes: []
         }
@@ -262,9 +273,29 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
   const updateStep = (index: number, updates: Partial<StepInput>) => {
     setFormData(prev => ({
       ...prev,
-      steps: prev.steps.map((c, i) =>
-        i === index ? { ...c, ...updates } : c
-      )
+      steps: prev.steps.map((c, i) => {
+        if (i !== index) return c;
+        
+        // Create the updated step
+        const updatedStep = { ...c, ...updates };
+        
+        // If changing from Habit to Tangible, remove habit-specific fields
+        if (updates.stepType === 'Tangible') {
+          delete updatedStep.timescale;
+          delete updatedStep.frequency;
+          delete updatedStep.nextOccurrence;
+          // Keep scheduling fields if tracked
+          if (!updatedStep.isTracked) {
+            delete updatedStep.startDateTime;
+            delete updatedStep.endDateTime;
+            delete updatedStep.repeatEndDate;
+            delete updatedStep.selectedDays;
+            delete updatedStep.scheduledTimes;
+          }
+        }
+        
+        return updatedStep;
+      })
     }));
   };
 
@@ -279,6 +310,9 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
         text: '',
         stepType: 'Tangible',
         isTracked: false,
+        startDateTime: new Date(),
+        endDateTime: undefined,
+        repeatEndDate: undefined,
         tasks: [],
         notes: []
       }],
