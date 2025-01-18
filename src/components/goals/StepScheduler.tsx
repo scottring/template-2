@@ -59,7 +59,17 @@ export function StepScheduler({ step, onUpdate }: StepSchedulerProps) {
       ? currentDays.filter(d => d !== day)
       : [...currentDays, day];
     
-    onUpdate({ selectedDays: newDays });
+    // Clean up scheduledTimes when deselecting a day
+    const updatedScheduledTimes = { ...(step.scheduledTimes || {}) };
+    if (currentDays.includes(day)) {
+      // If we're removing a day, delete its scheduled times
+      delete updatedScheduledTimes[day];
+    }
+    
+    onUpdate({ 
+      selectedDays: newDays,
+      scheduledTimes: updatedScheduledTimes 
+    });
   };
 
   const handleTimeChange = (newTime: string) => {
@@ -92,13 +102,15 @@ export function StepScheduler({ step, onUpdate }: StepSchedulerProps) {
         timescale: undefined,
         frequency: undefined,
         selectedDays: undefined,
-        repeatEndDate: undefined
+        repeatEndDate: undefined,
+        scheduledTimes: undefined
       });
     } else {
       onUpdate({
         timescale: 'weekly',
         frequency: 1,
         selectedDays: [],
+        scheduledTimes: {}
       });
     }
   };
@@ -203,6 +215,7 @@ export function StepScheduler({ step, onUpdate }: StepSchedulerProps) {
                     {DAYS_OF_WEEK.map((day) => (
                       <Button
                         key={day}
+                        type="button"
                         variant="outline"
                         size="sm"
                         className={cn(
@@ -211,7 +224,11 @@ export function StepScheduler({ step, onUpdate }: StepSchedulerProps) {
                             ? "bg-primary text-primary-foreground hover:bg-primary/90"
                             : "hover:bg-accent"
                         )}
-                        onClick={() => handleDayToggle(day)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDayToggle(day);
+                        }}
                       >
                         {day}
                       </Button>
