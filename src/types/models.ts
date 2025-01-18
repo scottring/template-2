@@ -133,14 +133,15 @@ export interface Note {
 }
 
 export interface ItineraryItem extends BaseItem {
-  type: 'task' | 'habit' | 'event';
+  type: 'task' | 'habit' | 'event' | 'tangible';
   referenceId: string;
   criteriaId?: string;
-  schedule: Schedule;
+  schedule?: Schedule;
   status: 'pending' | 'completed' | 'cancelled' | 'ongoing';
   notes: string;
   householdId: string;
   dueDate?: Date;
+  targetDate?: Date;
 }
 
 export type TaskCategory = 'chore' | 'errand' | 'maintenance' | 'kids' | 'meal' | 'shopping' | 'finance' | 'health' | 'social' | 'other';
