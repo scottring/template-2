@@ -1,67 +1,69 @@
 'use client';
 
 import { useState } from 'react';
-import { PlusIcon, Share2 } from 'lucide-react';
+import { PlusIcon, Share2, Pencil } from 'lucide-react';
 import useTaskStore from '@/lib/stores/useTaskStore';
 import useGoalStore from '@/lib/stores/useGoalStore';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { CreateTaskDialog } from '@/components/tasks/CreateTaskDialog';
+import { TaskDialog } from '@/components/tasks/TaskDialog';
 import { SharedIndicator } from '@/components/shared/SharedIndicator';
 import { ShareDialog } from '@/components/shared/ShareDialog';
-import { Task } from '@/types/models';
+import { Task, Goal } from '@/types/models';
 
 export function TasksSection({ goalId }: { goalId: string }) {
   const { user } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [sharingTask, setSharingTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const { tasks, completeTask } = useTaskStore();
   const { goals, updateGoal } = useGoalStore();
   
   // Get tasks from task store
   const goalTasks = tasks.filter((task) => task.goalId === goalId);
   
-  // Get tasks from success criteria
-  const goal = goals.find(g => g.id === goalId);
-  const criteriaTasks = goal?.successCriteria?.flatMap(c => 
-    (c.tasks || []).map(t => ({
+  // Get tasks from goal steps
+  const goal = goals.find(g => g.id === goalId) as Goal | undefined;
+  const stepTasks = goal?.steps.flatMap(step => 
+    (step.tasks || []).map(t => ({
       id: t.id,
       title: t.text,
-      description: `Task for success criterion: ${c.text}`,
+      description: `Task for step: ${step.text}`,
       status: t.completed ? 'completed' : 'pending',
       assignedTo: [],
       isCompleted: t.completed,
-      criteriaId: c.id
+      stepId: step.id
     }))
   ) || [];
 
   // Combine both sets of tasks
-  const allTasks = [...goalTasks, ...criteriaTasks];
+  const allTasks = [...goalTasks, ...stepTasks];
 
-  const handleTaskCompletion = async (task: Task | typeof criteriaTasks[0]) => {
+  const handleTaskCompletion = async (task: Task | typeof stepTasks[0]) => {
     if (!user || !goal) return;
 
     try {
-      if ('criteriaId' in task) {
-        // Handle success criteria task
-        const updatedCriteria = goal.successCriteria?.map(c => {
-          if (c.id === task.criteriaId) {
+      if ('stepId' in task) {
+        // Handle step task
+        const updatedSteps = goal?.steps.map(step => {
+          if (step.id === task.stepId) {
             return {
-              ...c,
-              tasks: (c.tasks || []).map(t => 
+              ...step,
+              tasks: (step.tasks || []).map(t => 
                 t.id === task.id 
                   ? { ...t, completed: !t.completed }
                   : t
               )
             };
           }
-          return c;
+          return step;
         });
 
-        if (!updatedCriteria) return;
+        if (!updatedSteps || !goal) return;
 
         await updateGoal(goal.id, {
           ...goal,
-          successCriteria: updatedCriteria
+          steps: updatedSteps
         });
       } else {
         // Handle regular task
@@ -105,6 +107,13 @@ export function TasksSection({ goalId }: { goalId: string }) {
                 />
                 <button
                   type="button"
+                  onClick={() => setEditingTask(task as Task)}
+                  className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSharingTask(task as Task)}
                   className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500"
                 >
@@ -134,6 +143,14 @@ export function TasksSection({ goalId }: { goalId: string }) {
           itemType="tasks"
           itemId={sharingTask.id}
           itemName={sharingTask.title}
+        />
+      )}
+
+      {editingTask && (
+        <TaskDialog
+          open={true}
+          onClose={() => setEditingTask(null)}
+          task={editingTask}
         />
       )}
     </div>
