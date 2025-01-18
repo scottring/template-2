@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import useItineraryStore from "@/lib/stores/useItineraryStore";
 import useGoalStore from "@/lib/stores/useGoalStore";
 import { UnscheduledTasks } from "@/components/dashboard/UnscheduledTasks";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { format, isPast } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { CalendarIcon, Trash2, ChevronRight, CheckCircle2, AlertCircle } from "lucide-react";
@@ -41,12 +41,25 @@ const dayNameToNumber = (name: string): number => {
   return days.indexOf(name);
 };
 
+type PendingItem = Omit<ItineraryItem, 'id'>;
+
+type DashboardItem = ItineraryItem | PendingItem;
+
 export default function DashboardPage() {
-  const { items: allItems, updateItem, deleteItem } = useItineraryStore();
-  const { goals: activeGoals } = useGoalStore();
+  const { items: allItems, updateItem, deleteItem, addItem, loadItems } = useItineraryStore();
+  const { goals: activeGoals, fetchGoals } = useGoalStore();
   const { user } = useAuth();
   const [selectedItem, setSelectedItem] = useState<ItineraryItem | null>(null);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.householdId) {
+      console.log('Loading initial data for dashboard...');
+      loadItems(user.householdId);
+      fetchGoals(user.householdId);
+    }
+  }, [user?.householdId, loadItems, fetchGoals]);
 
   // Filter items that are scheduled for today or are unfinished tangible steps
   const todayItems = useMemo(() => {
@@ -56,8 +69,6 @@ export default function DashboardPage() {
     
     // First, get all scheduled items from the itinerary
     const scheduledItems = allItems.filter(item => {
-      if (item.status === 'completed') return false;
-      
       // For habit steps, check if scheduled for today
       if (item.type === 'habit' && item.schedule?.schedules) {
         return item.schedule.schedules.some(schedule => schedule.day === currentDayOfWeek);
@@ -73,18 +84,27 @@ export default function DashboardPage() {
       return false;
     });
 
+    // Create a map of existing items to avoid duplicates
+    const existingItems = new Map(
+      scheduledItems.map(item => [`${item.referenceId}-${item.criteriaId}`, item])
+    );
+
     // Then, get all steps from goals that are scheduled for today but don't have itinerary items yet
     const stepsForToday = activeGoals.flatMap((goal: Goal) => 
       goal.steps
         .filter((step: Step) => {
-          // Skip if already completed or not tracked
+          // Skip if not tracked
           if (!step.isTracked) return false;
+          
+          // Skip if we already have an itinerary item for this step
+          const existingItem = existingItems.get(`${goal.id}-${step.id}`);
+          if (existingItem) return false;
           
           // Check if step is scheduled for today
           return step.selectedDays?.includes(currentDayName);
         })
         .map((step: Step) => ({
-          id: step.id,
+          // Don't include an ID for new items
           type: step.stepType.toLowerCase() as 'habit' | 'tangible',
           referenceId: goal.id,
           criteriaId: step.id,
@@ -105,17 +125,23 @@ export default function DashboardPage() {
         }))
     );
 
-    console.log('Steps for today:', stepsForToday); // Add logging to debug
-
-    // Combine and deduplicate items
-    const allScheduledItems = [...scheduledItems];
-    stepsForToday.forEach(stepItem => {
-      if (!allScheduledItems.some(item => item.criteriaId === stepItem.criteriaId)) {
-        allScheduledItems.push(stepItem);
+    // Combine items and sort by completion status and time
+    return [...scheduledItems, ...stepsForToday].sort((a, b) => {
+      // Put completed items at the bottom
+      if ('id' in a && 'id' in b) {
+        if (a.status === 'completed' && b.status !== 'completed') return 1;
+        if (a.status !== 'completed' && b.status === 'completed') return -1;
       }
+      
+      // Sort by scheduled time if available
+      const aSchedule = a.schedule?.schedules?.find(s => s.day === currentDayOfWeek);
+      const bSchedule = b.schedule?.schedules?.find(s => s.day === currentDayOfWeek);
+      if (aSchedule?.time && bSchedule?.time) {
+        return aSchedule.time.localeCompare(bSchedule.time);
+      }
+      
+      return 0;
     });
-
-    return allScheduledItems;
   }, [allItems, activeGoals, user]);
 
   const handleReschedule = (config: any) => {
@@ -128,33 +154,104 @@ export default function DashboardPage() {
       schedule.repeat = config.repeat;
       schedule.endDate = config.endDate;
     }
-    updateItem(selectedItem.id, {
-      schedule,
-      updatedBy: user.uid
-    });
+
+    // Only try to update if the item has an ID
+    if ('id' in selectedItem) {
+      updateItem(selectedItem.id, {
+        schedule,
+        updatedBy: user.uid
+      });
+    }
     setScheduleDialogOpen(false);
     setSelectedItem(null);
   };
 
-  const handleUnschedule = (itemId: string) => {
+  const handleUnschedule = (item: DashboardItem) => {
     if (!user) return;
-    deleteItem(itemId);
+    if ('id' in item) {
+      deleteItem(item.id);
+    }
   };
 
-  const handleMarkComplete = (item: ItineraryItem) => {
-    if (!user) return;
-
-    // For habits that are being marked as skipped, prompt for rescheduling
-    if (item.type === 'habit' && !item.status) {
-      setSelectedItem(item);
-      setScheduleDialogOpen(true);
+  const handleMarkComplete = async (item: DashboardItem) => {
+    if (!user || !user.householdId) {
+      console.log('No user or householdId');
       return;
     }
 
-    updateItem(item.id, { 
-      status: item.status === 'completed' ? 'pending' : 'completed',
-      updatedBy: user.uid
-    });
+    const itemKey = 'id' in item ? item.id : `${item.referenceId}-${item.criteriaId}`;
+    if (isUpdating) {
+      console.log('Already updating an item');
+      return;
+    }
+    
+    setIsUpdating(itemKey);
+
+    try {
+      console.log('Handling mark complete for item:', {
+        hasId: 'id' in item,
+        type: item.type,
+        notes: item.notes,
+        status: 'id' in item ? item.status : 'new item',
+        referenceId: item.referenceId,
+        criteriaId: item.criteriaId,
+        householdId: item.householdId
+      });
+
+      // If the item doesn't have an ID, it means it's a new item that needs to be created
+      if (!('id' in item)) {
+        console.log('Creating new itinerary item...');
+        // Create new itinerary item
+        const newItem = {
+          type: item.type,
+          referenceId: item.referenceId,
+          criteriaId: item.criteriaId,
+          notes: item.notes,
+          status: 'completed' as const,
+          householdId: user.householdId,
+          createdBy: user.uid,
+          updatedBy: user.uid,
+          schedule: item.schedule || {
+            startDate: new Date(),
+            schedules: []
+          }
+        };
+        
+        console.log('Adding new item:', newItem);
+        try {
+          const newId = await addItem(newItem);
+          console.log('Successfully added new item with ID:', newId);
+          // Force a refresh of items
+          await loadItems(user.householdId);
+        } catch (addError) {
+          console.error('Error adding item:', addError);
+          throw addError;
+        }
+      } else {
+        // For existing items, just update the status
+        console.log('Updating existing item:', {
+          id: item.id,
+          currentStatus: item.status,
+          newStatus: item.status === 'completed' ? 'pending' : 'completed'
+        });
+        try {
+          await updateItem(item.id, { 
+            status: item.status === 'completed' ? 'pending' : 'completed',
+            updatedBy: user.uid
+          });
+          console.log('Successfully updated item status');
+          // Force a refresh of items
+          await loadItems(user.householdId);
+        } catch (updateError) {
+          console.error('Error updating item:', updateError);
+          throw updateError;
+        }
+      }
+    } catch (error) {
+      console.error('Error updating item status:', error);
+    } finally {
+      setIsUpdating(null);
+    }
   };
 
   return (
@@ -212,14 +309,14 @@ export default function DashboardPage() {
                   initial="hidden"
                   animate="show"
                 >
-                  {todayItems.map((item: ItineraryItem) => {
+                  {todayItems.map((item: DashboardItem) => {
                     const todaySchedule = item.schedule?.schedules?.find(s => s.day === new Date().getDay());
                     const goal = activeGoals.find(g => g.id === item.referenceId);
                     const isOverdue = item.type === 'tangible' && item.targetDate && isPast(new Date(item.targetDate));
 
                     return (
                       <motion.div 
-                        key={item.id}
+                        key={'id' in item ? item.id : `${item.referenceId}-${item.criteriaId}`}
                         variants={itemVariants}
                         className={cn(
                           "group relative flex items-center justify-between p-4 rounded-lg transition-all duration-300",
@@ -234,19 +331,19 @@ export default function DashboardPage() {
                           <div className="relative">
                             <input
                               type="checkbox"
-                              checked={item.status === 'completed'}
+                              checked={'id' in item ? item.status === 'completed' : false}
                               className="peer absolute inset-0 opacity-0 cursor-pointer w-8 h-8 -left-1 -top-1 z-10"
                               onChange={() => handleMarkComplete(item)}
                             />
                             <div className={cn(
                               "w-6 h-6 rounded-full border-2 transition-colors duration-200",
                               "border-primary/20 peer-hover:border-primary/40",
-                              item.status === 'completed' ? "bg-primary/10" : "bg-transparent",
+                              'id' in item && item.status === 'completed' ? "bg-primary/10" : "bg-transparent",
                               isOverdue && "border-destructive/40"
                             )}>
                               <CheckCircle2 className={cn(
                                 "w-5 h-5 transition-opacity duration-200 pointer-events-none",
-                                item.status === 'completed' ? "opacity-100" : "opacity-0",
+                                'id' in item && item.status === 'completed' ? "opacity-100" : "opacity-0",
                                 isOverdue ? "text-destructive" : "text-primary"
                               )} />
                             </div>
@@ -255,7 +352,7 @@ export default function DashboardPage() {
                             <div className="flex items-center gap-2">
                               <p className={cn(
                                 "font-medium transition-all duration-200",
-                                item.status === 'completed' && "line-through text-muted-foreground"
+                                'id' in item && item.status === 'completed' && "line-through text-muted-foreground"
                               )}>
                                 {item.notes}
                               </p>
@@ -288,21 +385,23 @@ export default function DashboardPage() {
                             size="sm"
                             variant="ghost"
                             onClick={() => {
-                              setSelectedItem(item);
+                              setSelectedItem(item as ItineraryItem);
                               setScheduleDialogOpen(true);
                             }}
                             className="hover:bg-primary/10 hover:text-primary transition-colors"
                           >
                             <CalendarIcon className="h-4 w-4" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleUnschedule(item.id)}
-                            className="hover:bg-destructive/10 hover:text-destructive transition-colors"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {'id' in item && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleUnschedule(item)}
+                              className="hover:bg-destructive/10 hover:text-destructive transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </motion.div>
                     );
