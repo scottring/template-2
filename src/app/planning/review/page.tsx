@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { format, startOfWeek, endOfWeek } from "date-fns";
+import { format, startOfWeek, endOfWeek, addWeeks } from "date-fns";
 import useGoalStore from "@/lib/stores/useGoalStore";
 import useItineraryStore from "@/lib/stores/useItineraryStore";
 import useTaskStore from "@/lib/stores/useTaskStore";
@@ -18,18 +18,22 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ScheduleDialog } from "@/components/planning/ScheduleDialog";
 
 interface ReviewItem {
   id: string;
-  type: 'step' | 'task';
+  type: 'habit' | 'tangible' | 'task';
   text: string;
-  status: 'completed' | 'in_progress' | 'not_started';
+  status: 'completed' | 'in_progress' | 'not_started' | 'pending';
   goalId?: string;
   stepId?: string;
   timescale?: string;
   goalName?: string;
   nextOccurrence?: Date;
   frequency?: number;
+  targetDate?: Date;
+  completionCount?: number;
+  targetCount?: number;
 }
 
 interface ReviewSession {
@@ -39,8 +43,8 @@ interface ReviewSession {
   status: 'in_progress' | 'completed';
   reviewedItems: {
     id: string;
-    type: 'step' | 'task';
-    status: 'completed' | 'in_progress' | 'not_started';
+    type: ReviewItem['type'];
+    status: ReviewItem['status'];
     originalStatus: string;
     wasUpdated: boolean;
     goalId?: string;
@@ -53,12 +57,131 @@ interface ReviewSession {
   };
 }
 
+interface ReviewItemComponent {
+  item: ReviewItem;
+  onStatusUpdate: (item: ReviewItem, status: ReviewItem['status']) => void;
+  onReschedule: (item: ReviewItem) => void;
+}
+
+function ReviewItemCard({ item, onStatusUpdate, onReschedule }: ReviewItemComponent) {
+  return (
+    <Card className="p-6">
+      <div className="flex items-start justify-between">
+        <div className="space-y-1">
+          <h3 className="text-lg font-medium">{item.text}</h3>
+          {item.goalName && (
+            <p className="text-sm text-muted-foreground">
+              Goal: {item.goalName}
+            </p>
+          )}
+          {item.type === 'habit' && item.completionCount !== undefined && (
+            <p className="text-sm text-muted-foreground">
+              Completed {item.completionCount} time{item.completionCount !== 1 ? 's' : ''} 
+              {item.targetCount ? ` out of ${item.targetCount}` : ''}
+            </p>
+          )}
+          {item.type === 'tangible' && item.targetDate && (
+            <p className="text-sm text-muted-foreground">
+              Target Date: {format(new Date(item.targetDate), 'MMM do, yyyy')}
+            </p>
+          )}
+        </div>
+        
+        <div className="flex gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onStatusUpdate(item, 'completed')}
+                  className={cn(
+                    "hover:bg-primary/10",
+                    item.status === 'completed' && "bg-primary/10"
+                  )}
+                >
+                  <CheckCircle2 className={cn(
+                    "h-5 w-5",
+                    item.status === 'completed' ? "text-primary" : "text-muted-foreground"
+                  )} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Mark as completed</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onReschedule(item)}
+                  className="hover:bg-primary/10"
+                >
+                  <RefreshCw className="h-5 w-5 text-muted-foreground" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Reschedule</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+
+      {/* Feedback section */}
+      {item.type === 'habit' && item.completionCount !== undefined && item.targetCount && (
+        <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+          {item.completionCount === 0 ? (
+            <p>You haven't completed this habit this week. Would you like to adjust the schedule to make it more achievable?</p>
+          ) : item.completionCount < item.targetCount ? (
+            <p>You completed this {item.completionCount} time{item.completionCount !== 1 ? 's' : ''} this week. Let's aim for {item.targetCount} times next week!</p>
+          ) : (
+            <p>Great job! You met your goal of {item.targetCount} times this week!</p>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onReschedule(item)}
+            className="mt-2"
+          >
+            Adjust Schedule
+          </Button>
+        </div>
+      )}
+
+      {item.type === 'tangible' && item.status !== 'completed' && (
+        <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+          <p>This task is still pending. Would you like to schedule it for next week or leave it unscheduled?</p>
+          <div className="flex gap-2 mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onReschedule(item)}
+            >
+              Schedule for Next Week
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onStatusUpdate(item, 'in_progress')}
+            >
+              Leave Unscheduled
+            </Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export default function ReviewPage() {
   const { user, loading: authLoading } = useAuth();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { goals, loading: goalsLoading, error: goalsError, fetchGoals } = useGoalStore();
   const { items, loading: itemsLoading, error: itemsError, loadItems } = useItineraryStore();
   const { tasks, loading: tasksLoading, error: tasksError, fetchTasks } = useTaskStore();
+  const [selectedItem, setSelectedItem] = useState<ReviewItem | null>(null);
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [session, setSession] = useState<ReviewSession>({
     weekStartDate: startOfWeek(new Date()),
     weekEndDate: endOfWeek(new Date()),
@@ -79,7 +202,6 @@ export default function ReviewPage() {
       return;
     }
 
-    console.log('Starting refresh with household ID:', user.householdId);
     setIsRefreshing(true);
     
     try {
@@ -88,88 +210,99 @@ export default function ReviewPage() {
         loadItems(user.householdId),
         fetchTasks(user.householdId)
       ]);
-      console.log('Data fetched successfully:', {
-        goals: goals.length,
-        items: items.length,
-        tasks: tasks.length
-      });
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
       setIsRefreshing(false);
     }
-  }, [user?.householdId, fetchGoals, loadItems, fetchTasks, goals.length, items.length, tasks.length]);
+  }, [user?.householdId, fetchGoals, loadItems, fetchTasks]);
 
   // Initial data fetch
   useEffect(() => {
-    console.log('Review page mounted, auth state:', {
-      authLoading,
-      user: user?.uid,
-      householdId: user?.householdId
-    });
-    
     if (user && user.householdId) {
       handleRefresh();
     }
   }, [user, user?.householdId, handleRefresh]);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('Current state:', {
-      isRefreshing,
-      goalsLoading,
-      goalsError,
-      itemsLoading,
-      itemsError,
-      tasksLoading,
-      tasksError,
-      goalsCount: goals.length,
-      itemsCount: items.length,
-      tasksCount: tasks.length
-    });
-  }, [isRefreshing, goalsLoading, goalsError, itemsLoading, itemsError, tasksLoading, tasksError, goals.length, items.length, tasks.length]);
+  // Get all success criteria from active goals
+  const allSteps = useMemo(() => {
+    return goals
+      .filter(goal => goal.status !== 'cancelled')
+      .flatMap(goal => goal.steps);
+  }, [goals]);
 
-  // Show auth loading state
-  if (authLoading) {
-    console.log('Auth is loading...');
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="space-y-4 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-          <p className="text-muted-foreground">Loading your account...</p>
-        </div>
-      </div>
+  // Get all completed activities for the week
+  const getCompletedActivities = useCallback(() => {
+    if (!goals || !items) return [];
+
+    const weekStart = session.weekStartDate;
+    const weekEnd = session.weekEndDate;
+
+    // Group completed items by step
+    const completedByStep = items.reduce((acc, item) => {
+      if (item.status === 'completed' && item.criteriaId) {
+        if (!acc[item.criteriaId]) {
+          acc[item.criteriaId] = [];
+        }
+        acc[item.criteriaId].push(item);
+      }
+      return acc;
+    }, {} as Record<string, ItineraryItem[]>);
+
+    // Create review items for each step
+    return goals.flatMap(goal => 
+      goal.steps.map((step: Step) => {
+        const completedItems = completedByStep[step.id] || [];
+        const isHabit = step.stepType === 'Habit';
+        
+        return {
+          id: step.id,
+          type: step.stepType.toLowerCase() as 'habit' | 'tangible',
+          text: step.text,
+          status: completedItems.length > 0 ? 'completed' : 'not_started',
+          goalId: goal.id,
+          stepId: step.id,
+          goalName: goal.name,
+          targetDate: goal.targetDate,
+          completionCount: isHabit ? completedItems.length : undefined,
+          targetCount: isHabit && step.frequency ? step.frequency : undefined,
+          nextOccurrence: step.nextOccurrence
+        } as ReviewItem;
+      })
     );
-  }
+  }, [goals, items, session.weekStartDate, session.weekEndDate]);
 
-  // Show not authenticated state
-  if (!authLoading && !user) {
-    console.log('User is not authenticated');
+  const currentItems = useMemo<ReviewItem[]>(() => {
+    switch (session.step) {
+      case 'steps':
+        return getCompletedActivities();
+      case 'tasks':
+        return tasks.map(task => ({
+          id: task.id,
+          type: 'task',
+          text: task.title,
+          status: task.status === 'completed' ? 'completed' : 'pending',
+          goalId: task.goalId,
+          targetDate: task.dueDate
+        }));
+      default:
+        return [];
+    }
+  }, [session.step, getCompletedActivities, tasks]);
+
+  const stepTitles = useMemo(() => ({
+    steps: "Review Success Criteria",
+    tasks: "Check Tasks",
+    reconciliation: "Update Progress",
+    reflection: "Weekly Reflection"
+  }), []);
+
+  // Show loading state
+  if (authLoading || goalsLoading || itemsLoading || tasksLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="space-y-4 text-center">
-          <div className="text-destructive">
-            <XCircle className="h-8 w-8 mx-auto" />
-          </div>
-          <div>
-            <p className="font-medium">Not Authenticated</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Please sign in to access this page
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show loading state for initial load
-  if (!isRefreshing && (goalsLoading || itemsLoading || tasksLoading)) {
-    console.log('Showing loading state');
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="space-y-4 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-          <p className="text-muted-foreground">Loading your data...</p>
+        <div className="animate-spin">
+          <RefreshCw className="h-8 w-8 text-primary/60" />
         </div>
       </div>
     );
@@ -177,7 +310,6 @@ export default function ReviewPage() {
 
   // Show error state
   if (goalsError || itemsError || tasksError) {
-    console.log('Showing error state:', goalsError || itemsError || tasksError);
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="space-y-4 text-center">
@@ -202,73 +334,65 @@ export default function ReviewPage() {
     );
   }
 
-  const stepTitles = {
-    steps: "Review Success Criteria",
-    tasks: "Check Tasks",
-    reconciliation: "Update Progress",
-    reflection: "Weekly Reflection"
-  };
+  const handleStatusUpdate = (item: ReviewItem, newStatus: ReviewItem['status']) => {
+    setSession(prev => {
+      const updatedItems = [...prev.reviewedItems];
+      const existingIndex = updatedItems.findIndex(i => i.id === item.id);
+      
+      if (existingIndex >= 0) {
+        updatedItems[existingIndex] = {
+          ...updatedItems[existingIndex],
+          status: newStatus,
+          wasUpdated: true
+        };
+      } else {
+        updatedItems.push({
+          id: item.id,
+          type: item.type,
+          status: newStatus,
+          originalStatus: item.status,
+          wasUpdated: true,
+          goalId: item.goalId,
+          stepId: item.stepId
+        });
+      }
 
-  // Get all success criteria from active goals
-  const allSteps = goals
-    .filter(goal => goal.status !== 'cancelled')
-    .flatMap(goal => goal.successCriteria);
-
-  const getGoalItems = (goals: Goal[]): ReviewItem[] => {
-    return goals.flatMap(goal => {
-      return goal.successCriteria.map(step => ({
-        id: step.id,
-        type: 'step' as const,
-        text: step.text,
-        status: step.isTracked ? 'in_progress' : 'not_started',
-        goalId: goal.id,
-        stepId: step.id,
-        timescale: step.timescale,
-        goalName: goal.name,
-        nextOccurrence: step.nextOccurrence,
-        frequency: step.frequency
-      }));
+      return {
+        ...prev,
+        reviewedItems: updatedItems
+      };
     });
   };
 
-  const getCompletedActivities = (step: Step): string[] => {
-    const activities = [];
-    if (step.isTracked) {
-      activities.push('Tracked in Schedule');
-    }
-    if (step.tasks?.length > 0) {
-      activities.push(`${step.tasks.length} Tasks`);
-    }
-    if (step.notes?.length > 0) {
-      activities.push(`${step.notes.length} Notes`);
-    }
-    return activities;
+  const handleReschedule = (item: ReviewItem) => {
+    setSelectedItem(item);
+    setScheduleDialogOpen(true);
   };
 
-  const currentItems = session.step === 'steps'
-    ? getGoalItems(goals)
-    : session.step === 'tasks'
-      ? tasks
-      : [];
+  const handleScheduleConfirm = (config: any) => {
+    if (!selectedItem || !user) return;
 
-  const handleStatusUpdate = (id: string, newStatus: string, goalId?: string, stepId?: string) => {
-    setSession(prev => ({
-      ...prev,
-      reviewedItems: [
-        ...prev.reviewedItems,
-        {
-          id,
-          type: prev.step === 'steps' ? 'step' : 'task',
-          status: newStatus as any,
-          originalStatus: prev.step === 'steps' 
-            ? 'not_started' // We'll need to track status for steps
-            : items.find(i => i.id === id)?.status || '',
-          wasUpdated: true,
-          goalId,
-          stepId
-        }
-      ]
-    }));
+    // Create a new itinerary item for the rescheduled step
+    const newItem: Partial<ItineraryItem> = {
+      type: selectedItem.type,
+      referenceId: selectedItem.goalId!,
+      criteriaId: selectedItem.stepId,
+      notes: selectedItem.text,
+      status: 'pending',
+      householdId: user.householdId,
+      schedule: {
+        startDate: new Date(),
+        schedules: config.schedules,
+        repeat: config.repeat,
+        endDate: config.endDate
+      }
+    };
+
+    // Add to itinerary
+    // TODO: Call your addItem function here
+
+    setScheduleDialogOpen(false);
+    setSelectedItem(null);
   };
 
   const nextStep = () => {
@@ -298,56 +422,7 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {/* Header with refresh button */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-4xl font-bold">
-            <span className="bg-gradient-to-r from-primary via-accent-foreground to-primary bg-clip-text text-transparent">
-              {stepTitles[session.step]}
-            </span>
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Week of {format(session.weekStartDate, 'MMMM do, yyyy')}
-          </p>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={isRefreshing}
-          className={cn(
-            "gap-2",
-            isRefreshing && "animate-pulse"
-          )}
-        >
-          <RefreshCw className={cn(
-            "h-4 w-4",
-            isRefreshing && "animate-spin"
-          )} />
-          {isRefreshing ? "Refreshing..." : "Refresh"}
-        </Button>
-      </div>
-
-      {/* Progress Steps */}
-      <div className="flex items-center justify-between max-w-2xl">
-        {Object.entries(stepTitles).map(([key, title], index) => (
-          <div key={key} className="flex items-center">
-            <div className={cn(
-              "flex items-center justify-center w-10 h-10 rounded-full",
-              session.step === key ? "bg-primary text-primary-foreground" : 
-              index < Object.keys(stepTitles).indexOf(session.step) ? "bg-primary/20" : 
-              "bg-muted"
-            )}>
-              {index + 1}
-            </div>
-            {index < Object.keys(stepTitles).length - 1 && (
-              <div className="w-16 h-px bg-muted mx-2" />
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Main Content */}
+      {/* Review Content */}
       <Card className="p-6">
         <AnimatePresence mode="wait">
           <motion.div
@@ -357,111 +432,37 @@ export default function ReviewPage() {
             exit={{ opacity: 0, y: -20 }}
             className="space-y-6"
           >
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-semibold">{stepTitles[session.step]}</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={cn(
+                  "h-5 w-5",
+                  isRefreshing && "animate-spin"
+                )} />
+              </Button>
+            </div>
+
+            {/* Step Content */}
             {session.step === 'steps' && (
               <div className="space-y-4">
                 <p className="text-muted-foreground">
-                  Review your progress on each step.
+                  Review your progress on steps for this week.
                 </p>
-                {(currentItems as ReviewItem[]).map(item => {
-                  const step = allSteps.find(s => s.id === item.stepId);
-                  const activities = step ? getCompletedActivities(step) : [];
-                  return (
-                    <motion.div
+                <div className="grid gap-6">
+                  {currentItems.map((item) => (
+                    <ReviewItemCard
                       key={item.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="flex flex-col p-4 rounded-lg border border-primary/10 bg-card"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{item.text}</p>
-                            {item.timescale && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                                {item.timescale}
-                              </span>
-                            )}
-                          </div>
-                          {item.goalName && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                              Goal: {item.goalName}
-                            </p>
-                          )}
-                          {item.nextOccurrence && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Due: {format(item.nextOccurrence, 'MMM do')}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:bg-primary/10 hover:text-primary"
-                            onClick={() => handleStatusUpdate(item.id, 'completed', item.goalId, item.stepId)}
-                          >
-                            <CheckCircle2 className="h-5 w-5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:bg-yellow-500/10 hover:text-yellow-500"
-                            onClick={() => handleStatusUpdate(item.id, 'in_progress', item.goalId, item.stepId)}
-                          >
-                            <AlertCircle className="h-5 w-5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => handleStatusUpdate(item.id, 'not_started', item.goalId, item.stepId)}
-                          >
-                            <XCircle className="h-5 w-5" />
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Progress Section */}
-                      {activities.length > 0 && (
-                        <div className="mt-4 pl-4 border-l-2 border-primary/10">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-muted-foreground">
-                                Progress this week:
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {activities.length} activities
-                              </p>
-                            </div>
-                            
-                            {/* Progress Bar */}
-                            <div className="h-2 w-full bg-primary/10 rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-primary transition-all duration-500" 
-                                style={{ 
-                                  width: `${Math.min(100, (activities.length / (item.frequency || 1)) * 100)}%` 
-                                }}
-                              />
-                            </div>
-
-                            {/* Activity List */}
-                            <div className="mt-2 space-y-2">
-                              {activities.map((activity, index) => (
-                                <div 
-                                  key={index}
-                                  className="flex items-center gap-2 text-sm"
-                                >
-                                  <CheckCircle2 className="h-4 w-4 text-primary/60" />
-                                  <span>{activity}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  );
-                })}
+                      item={item}
+                      onStatusUpdate={handleStatusUpdate}
+                      onReschedule={handleReschedule}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -470,39 +471,16 @@ export default function ReviewPage() {
                 <p className="text-muted-foreground">
                   Check which tasks you've completed and which ones need attention.
                 </p>
-                {(currentItems as Task[]).map(task => (
-                  <motion.div
-                    key={task.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="flex items-center justify-between p-4 rounded-lg border border-primary/10 bg-card"
-                  >
-                    <div>
-                      <p className="font-medium">{task.title}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Due: {task.dueDate ? format(task.dueDate, 'MMM do') : 'No due date'}
-                      </p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="hover:bg-primary/10 hover:text-primary"
-                        onClick={() => handleStatusUpdate(task.id, 'completed')}
-                      >
-                        <CheckCircle2 className="h-5 w-5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => handleStatusUpdate(task.id, 'pending')}
-                      >
-                        <XCircle className="h-5 w-5" />
-                      </Button>
-                    </div>
-                  </motion.div>
-                ))}
+                <div className="grid gap-6">
+                  {currentItems.map((item) => (
+                    <ReviewItemCard
+                      key={item.id}
+                      item={item}
+                      onStatusUpdate={handleStatusUpdate}
+                      onReschedule={handleReschedule}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
@@ -514,31 +492,22 @@ export default function ReviewPage() {
                 {session.reviewedItems
                   .filter(item => item.wasUpdated)
                   .map(item => {
-                    const itemText = item.type === 'step'
-                      ? allSteps.find(s => s.id === item.id)?.text
-                      : tasks.find(t => t.id === item.id)?.title;
+                    const itemText = item.type === 'task'
+                      ? tasks.find(t => t.id === item.id)?.title
+                      : allSteps.find(s => s.id === item.id)?.text;
 
                     return (
                       <motion.div
                         key={item.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="p-4 rounded-lg border border-primary/10 bg-card"
+                        className="flex items-center justify-between p-4 rounded-lg border border-primary/10 bg-card"
                       >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{itemText}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Status changed from {item.originalStatus} to {item.status}
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:bg-primary/10 hover:text-primary"
-                          >
-                            Edit
-                          </Button>
+                        <div>
+                          <p className="font-medium">{itemText}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Status changed to: {item.status}
+                          </p>
                         </div>
                       </motion.div>
                     );
@@ -587,6 +556,19 @@ export default function ReviewPage() {
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
+
+      {selectedItem && (
+        <ScheduleDialog
+          open={scheduleDialogOpen}
+          onClose={() => {
+            setScheduleDialogOpen(false);
+            setSelectedItem(null);
+          }}
+          onSchedule={handleScheduleConfirm}
+          itemName={selectedItem.text}
+          targetDate={selectedItem.targetDate}
+        />
+      )}
     </div>
   );
 }
