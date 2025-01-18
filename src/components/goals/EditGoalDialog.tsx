@@ -5,7 +5,7 @@ import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon, ListTodo, StickyN
 import useGoalStore from '@/lib/stores/useGoalStore';
 import { useUserStore } from '@/lib/stores/useUserStore';
 import { UserSelect } from '@/components/shared/UserSelect';
-import { Goal, SuccessCriteria, GoalType } from '@/types/models';
+import { Goal, Step, GoalType } from '@/types/models';
 import { getNextOccurrence } from '@/lib/utils/itineraryGeneration';
 import useTaskStore from '@/lib/stores/useTaskStore';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -37,7 +37,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
     description: '',
     startDate: new Date(),
     targetDate: undefined as Date | undefined,
-    successCriteria: [] as SuccessCriteria[],
+    successCriteria: [] as Step[],
     progress: 0,
     assignedTo: [] as string[],
     householdId: '',
@@ -82,7 +82,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
   };
 
   const addCriteria = () => {
-    const newCriteria: SuccessCriteria = {
+    const newStep: Step = {
       id: crypto.randomUUID(),
       text: '',
       isTracked: false,
@@ -92,7 +92,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
 
     setFormData(prev => ({
       ...prev,
-      successCriteria: [...prev.successCriteria, newCriteria]
+      successCriteria: [...prev.successCriteria, newStep]
     }));
   };
 
@@ -103,7 +103,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
     }));
   };
 
-  const updateCriteria = (index: number, updates: Partial<SuccessCriteria>) => {
+  const updateCriteria = (index: number, updates: Partial<Step>) => {
     setFormData(prev => ({
       ...prev,
       successCriteria: prev.successCriteria.map((c, i) =>
@@ -230,16 +230,16 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
             </div>
 
             <div>
-              <Label>Success Criteria</Label>
+              <Label>Steps</Label>
               <div className="mt-4 space-y-4">
-                {formData.successCriteria.map((criteria, index) => (
-                  <Card key={criteria.id}>
+                {formData.successCriteria.map((step, index) => (
+                  <Card key={step.id}>
                     <CardContent className="p-4 space-y-4">
                       <div className="flex gap-x-2">
                         <Input
-                          value={criteria.text}
+                          value={step.text}
                           onChange={(e) => updateCriteria(index, { text: e.target.value })}
-                          placeholder="Enter success criteria"
+                          placeholder="Enter step"
                         />
                         {formData.successCriteria.length > 1 && (
                           <Button
@@ -260,7 +260,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            const tasks = criteria.tasks || [];
+                            const tasks = step.tasks || [];
                             handleAddTask(index, '');
                           }}
                         >
@@ -272,7 +272,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            const notes = criteria.notes || [];
+                            const notes = step.notes || [];
                             updateCriteria(index, {
                               notes: [...notes, { id: crypto.randomUUID(), text: '', timestamp: new Date() }]
                             });
@@ -283,15 +283,15 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                         </Button>
                       </div>
 
-                      {criteria.tasks && criteria.tasks.length > 0 && (
+                      {step.tasks && step.tasks.length > 0 && (
                         <div className="space-y-2">
-                          {criteria.tasks.map((task, taskIndex) => (
+                          {step.tasks.map((task, taskIndex) => (
                             <div key={task.id} className="flex items-center gap-x-2">
                               <input
                                 type="checkbox"
                                 checked={task.completed}
                                 onChange={(e) => {
-                                  const updatedTasks = [...criteria.tasks];
+                                  const updatedTasks = [...step.tasks];
                                   updatedTasks[taskIndex] = { ...task, completed: e.target.checked };
                                   updateCriteria(index, { tasks: updatedTasks });
                                 }}
@@ -300,7 +300,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                               <Input
                                 value={task.text}
                                 onChange={(e) => {
-                                  const updatedTasks = [...criteria.tasks];
+                                  const updatedTasks = [...step.tasks];
                                   updatedTasks[taskIndex] = { ...task, text: e.target.value };
                                   updateCriteria(index, { tasks: updatedTasks });
                                 }}
@@ -311,7 +311,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => {
-                                  const updatedTasks = criteria.tasks.filter((_, i) => i !== taskIndex);
+                                  const updatedTasks = step.tasks.filter((_, i) => i !== taskIndex);
                                   updateCriteria(index, { tasks: updatedTasks });
                                 }}
                               >
@@ -322,14 +322,14 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                         </div>
                       )}
 
-                      {criteria.notes && criteria.notes.length > 0 && (
+                      {step.notes && step.notes.length > 0 && (
                         <div className="space-y-2">
-                          {criteria.notes.map((note, noteIndex) => (
+                          {step.notes.map((note, noteIndex) => (
                             <div key={note.id} className="flex items-start gap-x-2">
                               <Textarea
                                 value={note.text}
                                 onChange={(e) => {
-                                  const updatedNotes = [...criteria.notes];
+                                  const updatedNotes = [...step.notes];
                                   updatedNotes[noteIndex] = { ...note, text: e.target.value };
                                   updateCriteria(index, { notes: updatedNotes });
                                 }}
@@ -341,7 +341,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => {
-                                  const updatedNotes = criteria.notes.filter((_, i) => i !== noteIndex);
+                                  const updatedNotes = step.notes.filter((_, i) => i !== noteIndex);
                                   updateCriteria(index, { notes: updatedNotes });
                                 }}
                               >
@@ -363,7 +363,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                 onClick={addCriteria}
               >
                 <PlusIcon className="h-4 w-4 mr-2" />
-                Add Criteria
+                Add Step
               </Button>
             </div>
 

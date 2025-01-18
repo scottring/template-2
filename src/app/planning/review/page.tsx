@@ -10,7 +10,7 @@ import useItineraryStore from "@/lib/stores/useItineraryStore";
 import useTaskStore from "@/lib/stores/useTaskStore";
 import { CheckCircle2, XCircle, AlertCircle, ChevronRight, ChevronUp, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Goal, ItineraryItem, SuccessCriteria, Task } from "@/types/models";
+import { Goal, ItineraryItem, Step, Task } from "@/types/models";
 import { useAuth } from "@/lib/hooks/useAuth";
 import {
   Tooltip,
@@ -19,19 +19,32 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+interface ReviewItem {
+  id: string;
+  type: 'step' | 'task';
+  text: string;
+  status: 'completed' | 'in_progress' | 'not_started';
+  goalId?: string;
+  stepId?: string;
+  timescale?: string;
+  goalName?: string;
+  nextOccurrence?: Date;
+  frequency?: number;
+}
+
 interface ReviewSession {
   weekStartDate: Date;
   weekEndDate: Date;
-  step: 'criteria' | 'tasks' | 'reconciliation' | 'reflection';
+  step: 'steps' | 'tasks' | 'reconciliation' | 'reflection';
   status: 'in_progress' | 'completed';
   reviewedItems: {
     id: string;
-    type: 'criteria' | 'task';
+    type: 'step' | 'task';
     status: 'completed' | 'in_progress' | 'not_started';
     originalStatus: string;
     wasUpdated: boolean;
     goalId?: string;
-    criteriaId?: string;
+    stepId?: string;
   }[];
   insights: {
     completedCount: number;
@@ -49,7 +62,7 @@ export default function ReviewPage() {
   const [session, setSession] = useState<ReviewSession>({
     weekStartDate: startOfWeek(new Date()),
     weekEndDate: endOfWeek(new Date()),
-    step: 'criteria',
+    step: 'steps',
     status: 'in_progress',
     reviewedItems: [],
     insights: {
@@ -190,85 +203,76 @@ export default function ReviewPage() {
   }
 
   const stepTitles = {
-    criteria: "Review Success Criteria",
+    steps: "Review Success Criteria",
     tasks: "Check Tasks",
     reconciliation: "Update Progress",
     reflection: "Weekly Reflection"
   };
 
   // Get all success criteria from active goals
-  const allCriteria = goals
+  const allSteps = goals
     .filter(goal => goal.status !== 'cancelled')
-    .flatMap(goal => 
-      goal.successCriteria.map(criteria => ({
-        ...criteria,
+    .flatMap(goal => goal.successCriteria);
+
+  const getGoalItems = (goals: Goal[]): ReviewItem[] => {
+    return goals.flatMap(goal => {
+      return goal.successCriteria.map(step => ({
+        id: step.id,
+        type: 'step' as const,
+        text: step.text,
+        status: step.isTracked ? 'in_progress' : 'not_started',
+        goalId: goal.id,
+        stepId: step.id,
+        timescale: step.timescale,
         goalName: goal.name,
-        goalId: goal.id
-      }))
-    );
-
-  // Get completed activities for the week
-  const getCompletedActivities = (criteria: any) => {
-    const completedItems = items.filter(item => 
-      item.referenceId === criteria.goalId && 
-      item.status === 'completed' &&
-      item.updatedAt >= session.weekStartDate &&
-      item.updatedAt <= session.weekEndDate
-    );
-
-    const completedTasks = tasks.filter(task =>
-      task.goalId === criteria.goalId &&
-      task.criteriaId === criteria.id &&
-      task.status === 'completed' &&
-      task.completedAt &&
-      task.completedAt >= session.weekStartDate &&
-      task.completedAt <= session.weekEndDate
-    );
-
-    return [...completedItems, ...completedTasks];
+        nextOccurrence: step.nextOccurrence,
+        frequency: step.frequency
+      }));
+    });
   };
 
-  const currentItems = session.step === 'criteria' 
-    ? allCriteria.filter(criteria => {
-        if (!criteria.isTracked) {
-          return false;
-        }
-        
-        if (criteria.nextOccurrence) {
-          const nextOcc = new Date(criteria.nextOccurrence);
-          return nextOcc >= session.weekStartDate && nextOcc <= session.weekEndDate;
-        }
-        
-        console.log('Including criteria without nextOccurrence:', criteria.text);
-        return true;
-      })
-    : items.filter(item => {
-        const itemDate = item.createdAt;
-        return itemDate >= session.weekStartDate && itemDate <= session.weekEndDate;
-      });
+  const getCompletedActivities = (step: Step): string[] => {
+    const activities = [];
+    if (step.isTracked) {
+      activities.push('Tracked in Schedule');
+    }
+    if (step.tasks?.length > 0) {
+      activities.push(`${step.tasks.length} Tasks`);
+    }
+    if (step.notes?.length > 0) {
+      activities.push(`${step.notes.length} Notes`);
+    }
+    return activities;
+  };
 
-  const handleStatusUpdate = (id: string, newStatus: string, goalId?: string, criteriaId?: string) => {
+  const currentItems = session.step === 'steps'
+    ? getGoalItems(goals)
+    : session.step === 'tasks'
+      ? tasks
+      : [];
+
+  const handleStatusUpdate = (id: string, newStatus: string, goalId?: string, stepId?: string) => {
     setSession(prev => ({
       ...prev,
       reviewedItems: [
         ...prev.reviewedItems,
         {
           id,
-          type: prev.step === 'criteria' ? 'criteria' : 'task',
+          type: prev.step === 'steps' ? 'step' : 'task',
           status: newStatus as any,
-          originalStatus: prev.step === 'criteria' 
-            ? 'not_started' // We'll need to track status for criteria
+          originalStatus: prev.step === 'steps' 
+            ? 'not_started' // We'll need to track status for steps
             : items.find(i => i.id === id)?.status || '',
           wasUpdated: true,
           goalId,
-          criteriaId
+          stepId
         }
       ]
     }));
   };
 
   const nextStep = () => {
-    const steps: ReviewSession['step'][] = ['criteria', 'tasks', 'reconciliation', 'reflection'];
+    const steps: ReviewSession['step'][] = ['steps', 'tasks', 'reconciliation', 'reflection'];
     const currentIndex = steps.indexOf(session.step);
     if (currentIndex < steps.length - 1) {
       setSession(prev => ({
@@ -353,16 +357,17 @@ export default function ReviewPage() {
             exit={{ opacity: 0, y: -20 }}
             className="space-y-6"
           >
-            {session.step === 'criteria' && (
+            {session.step === 'steps' && (
               <div className="space-y-4">
                 <p className="text-muted-foreground">
-                  Review your success criteria for this week. Mark which ones you've achieved.
+                  Review your progress on each step.
                 </p>
-                {currentItems.map((criteria: any) => {
-                  const completedActivities = getCompletedActivities(criteria);
+                {(currentItems as ReviewItem[]).map(item => {
+                  const step = allSteps.find(s => s.id === item.stepId);
+                  const activities = step ? getCompletedActivities(step) : [];
                   return (
                     <motion.div
-                      key={criteria.id}
+                      key={item.id}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       className="flex flex-col p-4 rounded-lg border border-primary/10 bg-card"
@@ -370,78 +375,54 @@ export default function ReviewPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="font-medium">{criteria.text}</p>
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                              {criteria.timescale}
-                            </span>
+                            <p className="font-medium">{item.text}</p>
+                            {item.timescale && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                {item.timescale}
+                              </span>
+                            )}
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            Goal: {criteria.goalName}
-                          </p>
-                          {criteria.nextOccurrence && (
+                          {item.goalName && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              Goal: {item.goalName}
+                            </p>
+                          )}
+                          {item.nextOccurrence && (
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              Due: {format(new Date(criteria.nextOccurrence), 'MMM do')}
+                              Due: {format(item.nextOccurrence, 'MMM do')}
                             </p>
                           )}
                         </div>
                         <div className="flex gap-2">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="hover:bg-primary/10 hover:text-primary"
-                                  onClick={() => handleStatusUpdate(criteria.id, 'completed', criteria.goalId, criteria.id)}
-                                >
-                                  <CheckCircle2 className="h-5 w-5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Mark as Achieved</p>
-                                <p className="text-xs text-muted-foreground">Successfully completed this criteria</p>
-                              </TooltipContent>
-                            </Tooltip>
-
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="hover:bg-yellow-500/10 hover:text-yellow-500"
-                                  onClick={() => handleStatusUpdate(criteria.id, 'in_progress', criteria.goalId, criteria.id)}
-                                >
-                                  <AlertCircle className="h-5 w-5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Mark as Partially Done</p>
-                                <p className="text-xs text-muted-foreground">Made progress but not fully achieved</p>
-                              </TooltipContent>
-                            </Tooltip>
-
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="hover:bg-destructive/10 hover:text-destructive"
-                                  onClick={() => handleStatusUpdate(criteria.id, 'not_started', criteria.goalId, criteria.id)}
-                                >
-                                  <XCircle className="h-5 w-5" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Mark as Not Done</p>
-                                <p className="text-xs text-muted-foreground">Didn't achieve this criteria</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-primary/10 hover:text-primary"
+                            onClick={() => handleStatusUpdate(item.id, 'completed', item.goalId, item.stepId)}
+                          >
+                            <CheckCircle2 className="h-5 w-5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-yellow-500/10 hover:text-yellow-500"
+                            onClick={() => handleStatusUpdate(item.id, 'in_progress', item.goalId, item.stepId)}
+                          >
+                            <AlertCircle className="h-5 w-5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => handleStatusUpdate(item.id, 'not_started', item.goalId, item.stepId)}
+                          >
+                            <XCircle className="h-5 w-5" />
+                          </Button>
                         </div>
                       </div>
 
-                      {/* Completed Activities Section */}
-                      {completedActivities.length > 0 && (
+                      {/* Progress Section */}
+                      {activities.length > 0 && (
                         <div className="mt-4 pl-4 border-l-2 border-primary/10">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
@@ -449,7 +430,7 @@ export default function ReviewPage() {
                                 Progress this week:
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {completedActivities.length} of {criteria.frequency || 1}
+                                {activities.length} activities
                               </p>
                             </div>
                             
@@ -458,38 +439,22 @@ export default function ReviewPage() {
                               <div 
                                 className="h-full bg-primary transition-all duration-500" 
                                 style={{ 
-                                  width: `${Math.min(100, (completedActivities.length / (criteria.frequency || 1)) * 100)}%` 
+                                  width: `${Math.min(100, (activities.length / (item.frequency || 1)) * 100)}%` 
                                 }}
                               />
                             </div>
 
                             {/* Activity List */}
                             <div className="mt-2 space-y-2">
-                              {completedActivities.map((activity) => {
-                                // Determine if this is a task or itinerary item
-                                const isTask = 'completedAt' in activity;
-                                const displayDate = isTask 
-                                  ? (activity as Task).completedAt 
-                                  : (activity as ItineraryItem).updatedAt;
-                                
-                                // Use the criteria text for the display text since that's what was actually completed
-                                const displayText = criteria.text;
-
-                                if (!displayDate) return null;
-
-                                return (
-                                  <div 
-                                    key={activity.id}
-                                    className="flex items-center gap-2 text-sm"
-                                  >
-                                    <CheckCircle2 className="h-4 w-4 text-primary/60" />
-                                    <span>{displayText}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {format(displayDate, 'MMM do')}
-                                    </span>
-                                  </div>
-                                );
-                              })}
+                              {activities.map((activity, index) => (
+                                <div 
+                                  key={index}
+                                  className="flex items-center gap-2 text-sm"
+                                >
+                                  <CheckCircle2 className="h-4 w-4 text-primary/60" />
+                                  <span>{activity}</span>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         </div>
@@ -505,7 +470,7 @@ export default function ReviewPage() {
                 <p className="text-muted-foreground">
                   Check which tasks you've completed and which ones need attention.
                 </p>
-                {(currentItems as ItineraryItem[]).map(task => (
+                {(currentItems as Task[]).map(task => (
                   <motion.div
                     key={task.id}
                     initial={{ opacity: 0, x: -20 }}
@@ -513,9 +478,9 @@ export default function ReviewPage() {
                     className="flex items-center justify-between p-4 rounded-lg border border-primary/10 bg-card"
                   >
                     <div>
-                      <p className="font-medium">{task.notes}</p>
+                      <p className="font-medium">{task.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        Due: {format(task.createdAt, 'MMM do')}
+                        Due: {task.dueDate ? format(task.dueDate, 'MMM do') : 'No due date'}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -548,34 +513,36 @@ export default function ReviewPage() {
                 </p>
                 {session.reviewedItems
                   .filter(item => item.wasUpdated)
-                  .map(item => (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="p-4 rounded-lg border border-primary/10 bg-card"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">
-                            {item.type === 'criteria' 
-                              ? allCriteria.find(c => c.id === item.id)?.text
-                              : items.find(i => i.id === item.id)?.notes}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Status changed from {item.originalStatus} to {item.status}
-                          </p>
+                  .map(item => {
+                    const itemText = item.type === 'step'
+                      ? allSteps.find(s => s.id === item.id)?.text
+                      : tasks.find(t => t.id === item.id)?.title;
+
+                    return (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="p-4 rounded-lg border border-primary/10 bg-card"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium">{itemText}</p>
+                            <p className="text-sm text-muted-foreground">
+                              Status changed from {item.originalStatus} to {item.status}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="hover:bg-primary/10 hover:text-primary"
+                          >
+                            Edit
+                          </Button>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="hover:bg-primary/10 hover:text-primary"
-                        >
-                          Edit
-                        </Button>
-                      </div>
-                    </motion.div>
-                  ))}
+                      </motion.div>
+                    );
+                  })}
               </div>
             )}
 

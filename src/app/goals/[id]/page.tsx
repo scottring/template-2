@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import useGoalStore from "@/lib/stores/useGoalStore";
 import { useProjectStore } from "@/lib/stores/useProjectStore";
-import { Goal, Project, SuccessCriteria } from "@/types/models";
+import { Goal, Project, Step } from "@/types/models";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { ShareDialog } from "@/components/shared/ShareDialog";
 import { SharedIndicator } from "@/components/shared/SharedIndicator";
@@ -168,14 +168,14 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
 
           <div className="overflow-hidden rounded-lg border bg-white shadow">
             <div className="p-6">
-              <h2 className="text-base font-semibold">Success Criteria</h2>
+              <h2 className="text-base font-semibold">Steps</h2>
               <ul className="mt-2 space-y-2">
-                {goal.successCriteria.map((criteria: SuccessCriteria, index: number) => (
+                {goal.successCriteria.map((step: Step, index: number) => (
                   <li key={index} className="flex items-start gap-x-3 text-sm">
                     <div className="relative mt-1 flex h-5 w-5 items-center justify-center">
                       <div className="h-4 w-4 rounded-full border-2" />
                     </div>
-                    <span className="text-gray-600">{criteria.text}</span>
+                    <span className="text-gray-600">{step.text}</span>
                   </li>
                 ))}
               </ul>

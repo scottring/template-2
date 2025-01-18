@@ -82,7 +82,7 @@ export interface Goal extends BaseItem {
   progress: number;
   goalType: GoalType;
   status: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
-  successCriteria: SuccessCriteria[];
+  successCriteria: Step[];
   assignedTo: string[];
   householdId: string;
 }
@@ -99,7 +99,7 @@ export interface Area extends BaseItem {
   assignedTo: string[];
 }
 
-export interface SuccessCriteria {
+export interface Step {
   id: string;
   text: string;
   isTracked: boolean;

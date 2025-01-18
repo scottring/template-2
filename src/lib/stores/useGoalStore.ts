@@ -246,7 +246,7 @@ const useGoalStore = create<GoalStore>((set, get) => ({
     future.setDate(future.getDate() + days);
     return get().goals.filter(goal => {
       const targetDate = goal.targetDate;
-      return targetDate >= now && targetDate <= future;
+      return targetDate && targetDate >= now && targetDate <= future;
     });
   }
 }));
