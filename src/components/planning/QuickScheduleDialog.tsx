@@ -26,6 +26,9 @@ import useAreaStore from '@/lib/stores/useAreaStore';
 import useGoalStore from '@/lib/stores/useGoalStore';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { StepScheduler } from '@/components/goals/StepScheduler';
+
+const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 interface QuickScheduleDialogProps {
   open: boolean;
@@ -42,6 +45,7 @@ interface SuccessCriteriaInput {
   nextOccurrence?: Date;
   repeatEndDate?: Date;
   selectedDays?: string[];
+  startDateTime?: Date;
   scheduledTimes?: {
     [day: string]: string[];
   };
@@ -263,9 +267,9 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
         goalType,
         startDate: new Date(startDate),
         targetDate: targetDate ? new Date(targetDate) : undefined,
-        successCriteria: criteria.filter(c => c.text.trim()).map(c => ({
-          id: crypto.randomUUID(),
-          ...c
+        steps: criteria.filter(c => c.text.trim()).map(c => ({
+          ...c,
+          id: crypto.randomUUID()
         })),
         status: 'not_started',
         progress: 0,
@@ -275,23 +279,23 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
 
       // Create itinerary items for tracked criteria
       for (const criterion of criteria.filter(c => c.isTracked)) {
-        if (!criterion.text || !criterion.timescale || !criterion.frequency) continue;
+        if (!criterion.text) continue;
 
         await addItem({
-          type: 'task',
+          type: criterion.stepType === 'Habit' ? 'habit' : 'tangible',
           referenceId: goalResult,
-          criteriaId: criterion.text,
+          criteriaId: criterion.id,
           schedule: {
-            startDate: new Date(startDate),
-            endDate: targetDate ? new Date(targetDate) : undefined,
+            startDate: criterion.startDateTime || new Date(startDate),
+            endDate: criterion.repeatEndDate,
             repeat: criterion.timescale,
-            schedules: scheduleTimes.map(st => ({
-              day: st.day,
-              time: st.time
-            }))
+            schedules: criterion.selectedDays?.map(day => ({
+              day: DAYS_OF_WEEK.indexOf(day),
+              time: '09:00' // Default time if none specified
+            })) || []
           },
           status: 'pending',
-          notes: '',
+          notes: criterion.text,
           householdId: user.householdId,
           createdBy: user.uid,
           updatedBy: user.uid
@@ -456,145 +460,36 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
                     </Select>
                   </div>
 
-                  <div className="flex items-center gap-x-6">
-                    <div className="flex items-center gap-x-2">
-                      <input
-                        type="checkbox"
-                        checked={criterion.isTracked}
-                        onChange={(e) => handleUpdateCriteria(index, { 
-                          isTracked: e.target.checked,
-                          timescale: e.target.checked && criterion.stepType === 'Habit' ? 'weekly' : undefined,
-                          frequency: e.target.checked && criterion.stepType === 'Habit' ? 1 : undefined,
-                          repeatEndDate: e.target.checked && criterion.stepType === 'Habit' ? (targetDate ? new Date(targetDate) : undefined) : undefined
-                        })}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                      <Label className="text-sm text-gray-600">Track in Schedule</Label>
-                    </div>
-                    {criterion.isTracked && (
-                      <div className="space-y-4 w-full">
-                        {/* Day Selection */}
-                        <div className="space-y-2">
-                          <Label className="text-sm font-medium text-gray-700">Select Days</Label>
-                          <div className="flex gap-2">
-                            {['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'].map((day) => (
-                              <button
-                                key={day}
-                                type="button"
-                                onClick={() => {
-                                  const selectedDays = criterion.selectedDays || [];
-                                  const newSelectedDays = selectedDays.includes(day) 
-                                    ? selectedDays.filter(d => d !== day)
-                                    : [...selectedDays, day];
-                                  handleUpdateCriteria(index, { selectedDays: newSelectedDays });
-                                }}
-                                className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                                  (criterion.selectedDays || []).includes(day)
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                              >
-                                {day}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Time Selection for each selected day */}
-                        {(criterion.selectedDays || []).map((day) => (
-                          <div key={day} className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">{getDayName(day)} Times</Label>
-                            {(criterion.scheduledTimes?.[day] || []).map((time, timeIndex) => (
-                              <div key={timeIndex} className="flex items-center gap-2">
-                                <div className="relative flex-1">
-                                  <select
-                                    value={time}
-                                    onChange={(e) => {
-                                      const times = { ...(criterion.scheduledTimes || {}) };
-                                      times[day] = times[day] || [];
-                                      times[day][timeIndex] = e.target.value;
-                                      handleUpdateCriteria(index, { scheduledTimes: times });
-                                    }}
-                                    className="w-full rounded-lg border border-gray-300 p-2.5 pl-10 appearance-none bg-white"
-                                  >
-                                    {Array.from({ length: 24 }, (_, i) => (
-                                      <option key={i} value={`${i.toString().padStart(2, '0')}:00`}>
-                                        {`${i.toString().padStart(2, '0')}:00`}
-                                      </option>
-                                    ))}
-                                  </select>
-                                  <Clock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    const times = { ...(criterion.scheduledTimes || {}) };
-                                    times[day] = times[day].filter((_, i) => i !== timeIndex);
-                                    handleUpdateCriteria(index, { scheduledTimes: times });
-                                  }}
-                                >
-                                  <TrashIcon className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ))}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                const times = { ...(criterion.scheduledTimes || {}) };
-                                times[day] = [...(times[day] || []), "09:00"];
-                                handleUpdateCriteria(index, { scheduledTimes: times });
-                              }}
-                            >
-                              <PlusIcon className="h-4 w-4 mr-1" /> Add Time
-                            </Button>
-                          </div>
-                        ))}
-
-                        {/* Repeat Settings - Only show for Habit steps */}
-                        {criterion.stepType === 'Habit' && (
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium text-gray-700">Repeat</Label>
-                              <Select
-                                value={criterion.timescale || 'weekly'}
-                                onValueChange={(value: TimeScale) => handleUpdateCriteria(index, { timescale: value })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="daily">Daily</SelectItem>
-                                  <SelectItem value="weekly">Weekly</SelectItem>
-                                  <SelectItem value="monthly">Monthly</SelectItem>
-                                  <SelectItem value="quarterly">Quarterly</SelectItem>
-                                  <SelectItem value="yearly">Yearly</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium text-gray-700">Repeat Until</Label>
-                              <div className="relative">
-                                <Input
-                                  type="date"
-                                  value={criterion.repeatEndDate?.toISOString().split('T')[0] || targetDate || ''}
-                                  onChange={(e) => handleUpdateCriteria(index, { 
-                                    repeatEndDate: e.target.value ? new Date(e.target.value) : (targetDate ? new Date(targetDate) : undefined)
-                                  })}
-                                  className="w-full pl-10"
-                                />
-                                <Calendar className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                  <div className="flex items-center gap-x-2">
+                    <input
+                      type="checkbox"
+                      checked={criterion.isTracked}
+                      onChange={(e) => handleUpdateCriteria(index, { 
+                        isTracked: e.target.checked,
+                        ...(e.target.checked ? {
+                          startDateTime: criterion.startDateTime || new Date(),
+                          timescale: criterion.stepType === 'Habit' ? (criterion.timescale || 'weekly') : undefined,
+                          frequency: criterion.stepType === 'Habit' ? (criterion.frequency || 1) : undefined,
+                          selectedDays: criterion.selectedDays || [],
+                          repeatEndDate: criterion.repeatEndDate || (targetDate ? new Date(targetDate) : undefined)
+                        } : {
+                          startDateTime: undefined,
+                          timescale: undefined,
+                          frequency: undefined,
+                          selectedDays: undefined,
+                          repeatEndDate: undefined
+                        })
+                      })}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label className="text-sm text-gray-600">Track in Schedule</Label>
                   </div>
+
+                  {criterion.isTracked && (
+                    <div className="space-y-4 w-full">
+                      <StepScheduler step={criterion} onUpdate={(updates) => handleUpdateCriteria(index, updates)} />
+                    </div>
+                  )}
                 </div>
 
                 {/* Tasks Section */}

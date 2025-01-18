@@ -102,10 +102,13 @@ export interface Area extends BaseItem {
 export interface Step {
   id: string;
   text: string;
+  details?: string;
   stepType: GoalType;
   isTracked: boolean;
   timescale?: TimeScale;
   frequency?: number;
+  startDateTime?: Date;
+  endDateTime?: Date;
   nextOccurrence?: Date;
   repeatEndDate?: Date;
   selectedDays?: string[];

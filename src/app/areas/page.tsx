@@ -1,40 +1,30 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Plus, Edit, Trash2, FolderIcon } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/lib/contexts/AuthContext';
 import useAreaStore from '@/lib/stores/useAreaStore';
-import { PlusIcon, MoreVertical, Trash, Share2 } from 'lucide-react';
-import { useState, useEffect, useCallback } from 'react';
+import { Area } from '@/types/models';
 import { CreateAreaDialog } from '@/components/areas/CreateAreaDialog';
 import { EditAreaDialog } from '@/components/areas/EditAreaDialog';
-import { collection, onSnapshot, query, orderBy, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase/firebase';
-import { Area } from '@/types/models';
-import { Menu, Transition } from '@headlessui/react';
-import { Fragment } from 'react';
-import { useRouter } from 'next/navigation';
-import { SharedIndicator } from '@/components/shared/SharedIndicator';
-import { ShareDialog } from '@/components/shared/ShareDialog';
-import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function AreasPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const { areas, loading, error, fetchAreas, deleteArea } = useAreaStore();
+  const [selectedArea, setSelectedArea] = useState<Area | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [editingArea, setEditingArea] = useState<Area | null>(null);
-  const [sharingArea, setSharingArea] = useState<Area | null>(null);
 
   useEffect(() => {
     if (user?.householdId) {
       fetchAreas(user.householdId);
     }
-  }, [fetchAreas, user?.householdId]);
+  }, [user?.householdId, fetchAreas]);
 
-  // Debug log when areas change
-  useEffect(() => {
-    console.log('Areas updated:', areas);
-  }, [areas]);
-
-  const handleDeleteArea = useCallback(async (areaId: string) => {
+  const handleDelete = async (areaId: string) => {
     if (window.confirm('Are you sure you want to delete this area? This action cannot be undone.')) {
       try {
         await deleteArea(areaId);
@@ -42,172 +32,141 @@ export default function AreasPage() {
         console.error('Error deleting area:', error);
       }
     }
-  }, [deleteArea]);
+  };
+
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 }
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-blue-500"></div>
+      <div className="container mx-auto py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold bg-gradient-to-br from-gray-800 to-gray-600 bg-clip-text text-transparent">
+            Areas
+          </h1>
+        </div>
+        <Card className="backdrop-blur-sm bg-white/50">
+          <CardContent className="p-6">
+            Loading...
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="p-4 text-red-500">
-        Error loading areas: {error}
+      <div className="container mx-auto py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold bg-gradient-to-br from-gray-800 to-gray-600 bg-clip-text text-transparent">
+            Areas
+          </h1>
+        </div>
+        <Card className="backdrop-blur-sm bg-white/50">
+          <CardContent className="p-6 text-red-500">
+            Error loading areas: {error}
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Areas</h1>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setIsCreateDialogOpen(true)}
-            className="inline-flex items-center gap-x-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-          >
-            <PlusIcon className="-ml-0.5 h-5 w-5" aria-hidden="true" />
-            New Area
-          </button>
-        </div>
+    <div className="container mx-auto py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold bg-gradient-to-br from-gray-800 to-gray-600 bg-clip-text text-transparent">
+          Areas
+        </h1>
+        <Button className="gap-2" onClick={() => setIsCreateDialogOpen(true)}>
+          <Plus className="h-4 w-4" />
+          New Area
+        </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <motion.div
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      >
         {areas.map((area) => (
-          <div
-            key={area.id}
-            className="relative flex flex-col overflow-hidden rounded-lg border bg-white shadow-sm"
-          >
-            <div className="absolute right-4 top-4">
-              <Menu as="div" className="relative inline-block text-left">
-                <Menu.Button className="flex items-center rounded-full bg-white text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
-                  <span className="sr-only">Open options</span>
-                  <MoreVertical className="h-5 w-5" aria-hidden="true" />
-                </Menu.Button>
-                <Transition
-                  as={Fragment}
-                  enter="transition ease-out duration-100"
-                  enterFrom="transform opacity-0 scale-95"
-                  enterTo="transform opacity-100 scale-100"
-                  leave="transition ease-in duration-75"
-                  leaveFrom="transform opacity-100 scale-100"
-                  leaveTo="transform opacity-0 scale-95"
-                >
-                  <Menu.Items className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                    <div className="py-1">
-                      <Menu.Item>
-                        {({ active }) => (
-                          <button
-                            onClick={() => setEditingArea(area)}
-                            className={`${
-                              active ? 'bg-gray-100 text-gray-900' : 'text-gray-700'
-                            } block w-full px-4 py-2 text-left text-sm`}
-                          >
-                            Edit
-                          </button>
-                        )}
-                      </Menu.Item>
-                      <Menu.Item>
-                        {({ active }) => (
-                          <button
-                            onClick={() => handleDeleteArea(area.id)}
-                            className={`${
-                              active ? 'bg-red-50 text-red-900' : 'text-red-700'
-                            } block w-full px-4 py-2 text-left text-sm`}
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </Menu.Item>
-                    </div>
-                  </Menu.Items>
-                </Transition>
-              </Menu>
-            </div>
-            <div className="p-6">
-              <div className="flex items-center gap-x-3">
-                <h3 className="text-lg font-semibold text-gray-900">
+          <motion.div key={area.id} variants={item}>
+            <Card className="backdrop-blur-sm bg-white/50 hover:bg-white/60 transition-all border-primary/20">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <FolderIcon className="h-4 w-4 text-primary" />
+                  </div>
                   {area.name}
-                </h3>
-                {area.isFocus && (
-                  <span className="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-800 ring-1 ring-inset ring-yellow-600/20">
-                    Focus
-                  </span>
-                )}
-                {area.isActive && (
-                  <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                    Active
-                  </span>
-                )}
-                <SharedIndicator sharedWith={area.assignedTo} />
-              </div>
-              <p className="mt-2 text-sm text-gray-500">{area.description}</p>
-            </div>
-            <div className="mt-auto flex divide-x border-t">
-              <button
-                type="button"
-                onClick={() => router.push(`/areas/${area.id}`)}
-                className="flex w-full items-center justify-center gap-x-2.5 p-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-              >
-                View Goals
-              </button>
-              <button
-                type="button"
-                onClick={() => setSharingArea(area)}
-                className="flex w-full items-center justify-center gap-x-2.5 p-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-              >
-                <Share2 className="h-4 w-4" />
-                Share
-              </button>
-            </div>
-          </div>
+                </CardTitle>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-gray-500 hover:text-primary"
+                    onClick={() => setSelectedArea(area)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-gray-500 hover:text-red-600"
+                    onClick={() => handleDelete(area.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-500 mb-4">{area.description || 'No description'}</p>
+                <div className="flex flex-wrap gap-2">
+                  {area.isFocus && (
+                    <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
+                      Focus Area
+                    </Badge>
+                  )}
+                  {!area.isActive && (
+                    <Badge variant="secondary" className="bg-gray-100 text-gray-500">
+                      Inactive
+                    </Badge>
+                  )}
+                  {area.parentId && (
+                    <Badge variant="secondary" className="bg-blue-50 text-blue-600">
+                      Sub-Area
+                    </Badge>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
+      </motion.div>
 
-        {areas.length === 0 && (
-          <div className="col-span-full flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 text-center">
-            <h3 className="mt-2 text-sm font-semibold text-gray-900">
-              No areas defined
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Get started by creating a new life area
-            </p>
-            <button
-              type="button"
-              onClick={() => setIsCreateDialogOpen(true)}
-              className="mt-6 inline-flex items-center gap-x-2 rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-            >
-              <PlusIcon className="-ml-0.5 h-5 w-5" aria-hidden="true" />
-              New Area
-            </button>
-          </div>
-        )}
-      </div>
-
-      <CreateAreaDialog
-        open={isCreateDialogOpen}
-        onClose={() => setIsCreateDialogOpen(false)}
+      <CreateAreaDialog 
+        open={isCreateDialogOpen} 
+        onClose={() => setIsCreateDialogOpen(false)} 
       />
 
-      {editingArea && (
+      {selectedArea && (
         <EditAreaDialog
-          open={!!editingArea}
-          onClose={() => setEditingArea(null)}
-          area={editingArea}
-        />
-      )}
-
-      {sharingArea && (
-        <ShareDialog
-          open={!!sharingArea}
-          onClose={() => setSharingArea(null)}
-          itemId={sharingArea.id}
-          itemType="area"
-          itemName={sharingArea.name}
+          open={!!selectedArea}
+          onClose={() => setSelectedArea(null)}
+          area={selectedArea}
         />
       )}
     </div>
-  );
+  )
 }

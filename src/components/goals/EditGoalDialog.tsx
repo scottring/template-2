@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { StepScheduler } from './StepScheduler';
 
 interface EditGoalDialogProps {
   open: boolean;
@@ -125,20 +126,25 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
               id: note.id,
               text: note.text || '',
               timestamp: note.timestamp || new Date()
-            })),
-            repeatEndDate: step.repeatEndDate instanceof Date ? step.repeatEndDate : undefined,
-            selectedDays: step.selectedDays || [],
-            scheduledTimes: step.scheduledTimes || {}
+            }))
           };
 
-          // Add habit-specific properties only if it's a Habit type and isTracked
-          if (step.isTracked && step.stepType === 'Habit') {
-            return {
-              ...baseStep,
-              timescale: step.timescale || 'weekly',
-              frequency: step.frequency || 1,
-              nextOccurrence: getNextOccurrence(formData.startDate, step.timescale || 'weekly')
-            };
+          // Add scheduling properties if step is tracked
+          if (step.isTracked) {
+            Object.assign(baseStep, {
+              startDateTime: step.startDateTime instanceof Date ? step.startDateTime : new Date(),
+              repeatEndDate: step.repeatEndDate instanceof Date ? step.repeatEndDate : undefined,
+              selectedDays: step.selectedDays || [],
+              // Add habit-specific properties only if it's a Habit type
+              ...(step.stepType === 'Habit' ? {
+                timescale: step.timescale || 'weekly',
+                frequency: step.frequency || 1,
+                nextOccurrence: getNextOccurrence(
+                  step.startDateTime instanceof Date ? step.startDateTime : new Date(),
+                  step.timescale || 'weekly'
+                )
+              } : {})
+            });
           }
 
           return baseStep;
@@ -169,8 +175,12 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
         {
           id: crypto.randomUUID(),
           text: '',
+          details: '',
           stepType: 'Tangible' as const,
           isTracked: false,
+          startDateTime: new Date(),
+          endDateTime: undefined,
+          repeatEndDate: undefined,
           tasks: [],
           notes: []
         }
@@ -199,7 +209,21 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
           delete updatedStep.timescale;
           delete updatedStep.frequency;
           delete updatedStep.nextOccurrence;
-          // Keep selectedDays and scheduledTimes as they apply to both types
+          // Keep scheduling fields if tracked
+          if (!updatedStep.isTracked) {
+            delete updatedStep.startDateTime;
+            delete updatedStep.endDateTime;
+            delete updatedStep.repeatEndDate;
+            delete updatedStep.selectedDays;
+            delete updatedStep.scheduledTimes;
+          }
+        } else if (updates.stepType === 'Habit' && updatedStep.isTracked) {
+          // When changing to Habit, initialize habit fields if tracked
+          updatedStep.startDateTime = updatedStep.startDateTime || new Date();
+          updatedStep.timescale = 'weekly';
+          updatedStep.frequency = 1;
+          updatedStep.selectedDays = updatedStep.selectedDays || [];
+          updatedStep.repeatEndDate = updatedStep.repeatEndDate || formData.targetDate;
         }
         
         return updatedStep;
@@ -302,37 +326,21 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
               <Label>Steps</Label>
               {formData.steps.map((step, index) => (
                 <Card key={step.id} className="p-4 space-y-4">
-                  <div className="flex gap-x-2 items-center">
-                    <div className="flex-1">
-                      <Input
-                        value={step.text}
-                        onChange={(e) => updateStep(index, { text: e.target.value })}
-                        placeholder="Enter step"
-                        className="hover:bg-gray-50 cursor-pointer"
-                        onClick={() => setActiveStepIndex(index)}
-                      />
-                    </div>
-                    <div className="flex gap-x-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setActiveStepIndex(index)}
-                      >
-                        <ListTodo className="h-4 w-4" />
-                      </Button>
-                      {formData.steps.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="text-red-600 hover:text-red-700"
-                          onClick={() => removeStep(index)}
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+                  <div className="flex items-center gap-x-4 mb-4">
+                    <Input
+                      value={step.text}
+                      onChange={(e) => updateStep(index, { text: e.target.value })}
+                      placeholder="Step name"
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeStep(index)}
+                      className="shrink-0"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </Button>
                   </div>
 
                   {activeStepIndex === index && (
@@ -341,8 +349,8 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
                         <div className="space-y-2">
                           <Label>Step Details</Label>
                           <Textarea
-                            value={step.text}
-                            onChange={(e) => updateStep(index, { text: e.target.value })}
+                            value={step.details || ''}
+                            onChange={(e) => updateStep(index, { details: e.target.value })}
                             placeholder="Add more details about this step"
                             rows={3}
                           />
@@ -368,21 +376,29 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
                       <Select
                         value={step.stepType}
                         onValueChange={(value: GoalType) => {
-                          // When changing to Tangible, preserve the base fields but remove habit-specific ones
                           if (value === 'Tangible') {
-                            const { timescale, frequency, selectedDays, scheduledTimes, nextOccurrence, ...baseStep } = step;
-                            updateStep(index, { ...baseStep, stepType: value });
+                            // When changing to Tangible, keep scheduling but remove habit-specific fields
+                            const { timescale, frequency, nextOccurrence, ...baseStep } = step;
+                            updateStep(index, { 
+                              ...baseStep, 
+                              stepType: value,
+                              // Keep scheduling fields if isTracked
+                              ...(step.isTracked ? {
+                                startDateTime: step.startDateTime || new Date(),
+                                selectedDays: step.selectedDays || [],
+                                repeatEndDate: step.repeatEndDate || formData.targetDate
+                              } : {})
+                            });
                           } else {
-                            // When changing to Habit, keep existing data
+                            // When changing to Habit, initialize habit fields if tracked
                             updateStep(index, { 
                               ...step,
                               stepType: value,
-                              // Only add habit fields if it's tracked
                               ...(step.isTracked ? {
-                                timescale: step.timescale || 'weekly',
-                                frequency: step.frequency || 1,
+                                startDateTime: step.startDateTime || new Date(),
+                                timescale: 'weekly',
+                                frequency: 1,
                                 selectedDays: step.selectedDays || [],
-                                scheduledTimes: step.scheduledTimes || {},
                                 repeatEndDate: step.repeatEndDate || formData.targetDate
                               } : {})
                             });
@@ -406,13 +422,19 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
                           checked={step.isTracked}
                           onChange={(e) => updateStep(index, { 
                             isTracked: e.target.checked,
-                            ...(e.target.checked && step.stepType === 'Habit' ? {
-                              timescale: step.timescale || 'weekly',
-                              frequency: step.frequency || 1,
+                            ...(e.target.checked ? {
+                              startDateTime: step.startDateTime || new Date(),
+                              timescale: step.stepType === 'Habit' ? (step.timescale || 'weekly') : undefined,
+                              frequency: step.stepType === 'Habit' ? (step.frequency || 1) : undefined,
                               selectedDays: step.selectedDays || [],
-                              scheduledTimes: step.scheduledTimes || {},
                               repeatEndDate: step.repeatEndDate || formData.targetDate
-                            } : {})
+                            } : {
+                              startDateTime: undefined,
+                              timescale: undefined,
+                              frequency: undefined,
+                              selectedDays: undefined,
+                              repeatEndDate: undefined
+                            })
                           })}
                           className="h-4 w-4 rounded border-gray-300"
                         />
@@ -420,126 +442,7 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
                       </div>
                       {step.isTracked && (
                         <div className="space-y-4 w-full">
-                          {/* Day Selection */}
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium text-gray-700">Select Days</Label>
-                            <div className="flex gap-2">
-                              {['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'].map((day) => (
-                                <button
-                                  key={day}
-                                  type="button"
-                                  onClick={() => {
-                                    const selectedDays = step.selectedDays || [];
-                                    const newSelectedDays = selectedDays.includes(day) 
-                                      ? selectedDays.filter(d => d !== day)
-                                      : [...selectedDays, day];
-                                    updateStep(index, { selectedDays: newSelectedDays });
-                                  }}
-                                  className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
-                                    (step.selectedDays || []).includes(day)
-                                      ? 'bg-blue-600 text-white'
-                                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                  }`}
-                                >
-                                  {day}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Time Selection for each selected day */}
-                          {(step.selectedDays || []).map((day) => (
-                            <div key={day} className="space-y-2">
-                              <Label className="text-sm font-medium text-gray-700">{getDayName(day)} Times</Label>
-                              {(step.scheduledTimes?.[day] || []).map((time, timeIndex) => (
-                                <div key={timeIndex} className="flex items-center gap-2">
-                                  <div className="relative flex-1">
-                                    <select
-                                      value={time}
-                                      onChange={(e) => {
-                                        const times = { ...(step.scheduledTimes || {}) };
-                                        times[day] = times[day] || [];
-                                        times[day][timeIndex] = e.target.value;
-                                        updateStep(index, { scheduledTimes: times });
-                                      }}
-                                      className="w-full rounded-lg border border-gray-300 p-2.5 pl-10 appearance-none bg-white"
-                                    >
-                                      {Array.from({ length: 24 }, (_, i) => (
-                                        <option key={i} value={`${i.toString().padStart(2, '0')}:00`}>
-                                          {`${i.toString().padStart(2, '0')}:00`}
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <Clock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      const times = { ...(step.scheduledTimes || {}) };
-                                      times[day] = times[day].filter((_, i) => i !== timeIndex);
-                                      updateStep(index, { scheduledTimes: times });
-                                    }}
-                                  >
-                                    <TrashIcon className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ))}
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  const times = { ...(step.scheduledTimes || {}) };
-                                  times[day] = [...(times[day] || []), "09:00"];
-                                  updateStep(index, { scheduledTimes: times });
-                                }}
-                              >
-                                <PlusIcon className="h-4 w-4 mr-1" /> Add Time
-                              </Button>
-                            </div>
-                          ))}
-
-                          {/* Repeat Settings - Only show for Habit steps */}
-                          {step.stepType === 'Habit' && (
-                            <div className="space-y-4">
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium text-gray-700">Repeat</Label>
-                                <Select
-                                  value={step.timescale || 'weekly'}
-                                  onValueChange={(value: TimeScale) => updateStep(index, { timescale: value })}
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="daily">Daily</SelectItem>
-                                    <SelectItem value="weekly">Weekly</SelectItem>
-                                    <SelectItem value="monthly">Monthly</SelectItem>
-                                    <SelectItem value="quarterly">Quarterly</SelectItem>
-                                    <SelectItem value="yearly">Yearly</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium text-gray-700">Repeat Until</Label>
-                                <div className="relative">
-                                  <Input
-                                    type="date"
-                                    value={step.repeatEndDate instanceof Date ? step.repeatEndDate.toISOString().split('T')[0] : 
-                                          formData.targetDate instanceof Date ? formData.targetDate.toISOString().split('T')[0] : ''}
-                                    onChange={(e) => updateStep(index, { 
-                                      repeatEndDate: e.target.value ? new Date(e.target.value) : formData.targetDate
-                                    })}
-                                    className="w-full pl-10"
-                                  />
-                                  <Calendar className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                          <StepScheduler step={step} onUpdate={(updates) => updateStep(index, updates)} />
                         </div>
                       )}
                     </div>
