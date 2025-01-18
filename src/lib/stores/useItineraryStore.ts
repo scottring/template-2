@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ItineraryItem, Schedule, TimeScale, Goal, SuccessCriteria } from '@/types/models';
+import { ItineraryItem, Schedule, TimeScale, Goal } from '@/types/models';
 import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where, getDoc, setDoc, writeBatch, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { startOfDay, endOfDay, addDays, isSameDay, isWithinInterval } from 'date-fns';
@@ -28,6 +28,7 @@ interface ItineraryStore {
   getUpcomingItems: (startDate: Date, endDate: Date) => ItineraryItem[];
   getNeedsAttention: () => ItineraryItem[];
   getStreak: (itemId: string) => number;
+  getProgress: (itemId: string) => { completed: number; total: number; lastUpdatedAt: Date } | null;
   
   // Goal integration
   generateFromGoal: (goal: Goal) => Promise<void>;
@@ -418,13 +419,13 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
     try {
       const { addItem } = get();
       
-      const trackedCriteria = goal.successCriteria.filter(criteria => criteria.isTracked);
+      const trackedSteps = goal.steps.filter(step => step.isTracked);
       
-      for (const criteria of trackedCriteria) {
+      for (const step of trackedSteps) {
         const habitData: Omit<ItineraryItem, 'id' | 'createdAt' | 'updatedAt'> = {
           type: 'habit',
           referenceId: goal.id,
-          notes: criteria.text,
+          notes: step.text,
           status: 'pending',
           createdBy: 'system',
           updatedBy: 'system',
@@ -432,7 +433,7 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
           schedule: {
             startDate: new Date(),
             schedules: [{ day: new Date().getDay(), time: '09:00' }],
-            repeat: criteria.timescale || 'weekly'
+            repeat: 'weekly'
           }
         };
 
@@ -462,6 +463,50 @@ const useItineraryStore = create<ItineraryStore>((set, get) => ({
       console.error('Error updating criteria status:', error);
       throw error;
     }
+  },
+
+  getProgress: (itemId: string) => {
+    const { items } = get();
+    const item = items.find(i => i.id === itemId);
+    if (!item || !item.schedule) return null;
+
+    const today = new Date();
+    const startDate = item.schedule.startDate;
+    const endDate = item.schedule.endDate || today;
+
+    // Calculate total expected completions based on schedule
+    let total = 0;
+    let completed = 0;
+    let lastUpdatedAt = startDate;
+
+    // Get all items with this ID (including completed ones)
+    const allInstances = items.filter(i => i.id === itemId);
+
+    // Count completed instances
+    allInstances.forEach(instance => {
+      if (instance.status === 'completed' && instance.updatedAt) {
+        completed++;
+        if (instance.updatedAt > lastUpdatedAt) {
+          lastUpdatedAt = instance.updatedAt;
+        }
+      }
+    });
+
+    // Calculate total based on schedule frequency
+    const { schedules, repeat } = item.schedule;
+    if (repeat === 'daily') {
+      total = schedules.length * 7; // Daily for each scheduled time
+    } else if (repeat === 'weekly') {
+      total = schedules.length; // Once per scheduled time per week
+    } else if (repeat === 'monthly') {
+      total = Math.ceil(schedules.length / 4); // Roughly once per scheduled time per month
+    }
+
+    return {
+      completed,
+      total,
+      lastUpdatedAt
+    };
   },
 }));
 

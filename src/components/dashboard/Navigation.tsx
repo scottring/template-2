@@ -43,27 +43,9 @@ type NavItem = NavItemWithHref | NavItemWithChildren;
 
 const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { 
-    name: 'Planning & Review', 
-    icon: CalendarDays,
-    children: [
-      { name: 'Weekly Review', href: '/planning/review', icon: ClipboardList },
-      { name: 'Weekly Planning', href: '/planning/weekly', icon: CalendarDays },
-      { name: 'Monthly Planning', href: '/planning/monthly', icon: CalendarRange },
-      { name: 'Quarterly Planning', href: '/planning/quarterly', icon: CalendarClock },
-    ]
-  },
-  { name: 'Itinerary', href: '/itinerary', icon: Map },
-  { name: 'Calendar', href: '/calendar', icon: Calendar },
-  {
-    name: 'Foundations',
-    icon: BrickWall,
-    children: [
-      { name: 'Areas', href: '/areas', icon: MapPin },
-      { name: 'Goals', href: '/goals', icon: Target },
-      { name: 'Tasks', href: '/tasks', icon: ListTodo },   
-    ],
-  },
+  { name: 'Goals', href: '/goals', icon: Target },
+  { name: 'Track', href: '/track', icon: ClipboardList },
+  { name: 'Review & Plan', href: '/review', icon: CalendarDays },
   { name: 'Family', href: '/family', icon: Users },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
