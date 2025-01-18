@@ -82,7 +82,7 @@ export interface Goal extends BaseItem {
   progress: number;
   goalType: GoalType;
   status: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
-  successCriteria: Step[];
+  steps: Step[];
   assignedTo: string[];
   householdId: string;
 }
@@ -102,10 +102,16 @@ export interface Area extends BaseItem {
 export interface Step {
   id: string;
   text: string;
+  stepType: GoalType;
   isTracked: boolean;
   timescale?: TimeScale;
   frequency?: number;
   nextOccurrence?: Date;
+  repeatEndDate?: Date;
+  selectedDays?: string[];
+  scheduledTimes?: {
+    [day: string]: string[];
+  };
   tasks: { id: string; text: string; completed: boolean; }[];
   notes: { id: string; text: string; timestamp: Date; }[];
 }

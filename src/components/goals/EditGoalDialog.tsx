@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon, ListTodo, StickyNote } from 'lucide-react';
+import { X as XMarkIcon, Plus as PlusIcon, Trash as TrashIcon, ListTodo, StickyNote, Clock, Calendar } from 'lucide-react';
 import useGoalStore from '@/lib/stores/useGoalStore';
 import { useUserStore } from '@/lib/stores/useUserStore';
 import { UserSelect } from '@/components/shared/UserSelect';
-import { Goal, Step, GoalType } from '@/types/models';
+import { Goal, Step, GoalType, TimeScale } from '@/types/models';
 import { getNextOccurrence } from '@/lib/utils/itineraryGeneration';
 import useTaskStore from '@/lib/stores/useTaskStore';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -25,6 +25,19 @@ interface EditGoalDialogProps {
   onClose: () => void;
 }
 
+const getDayName = (day: string): string => {
+  const days = {
+    'Su': 'Sunday',
+    'M': 'Monday',
+    'Tu': 'Tuesday',
+    'W': 'Wednesday',
+    'Th': 'Thursday',
+    'F': 'Friday',
+    'Sa': 'Saturday'
+  };
+  return days[day as keyof typeof days] || day;
+};
+
 export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
   const updateGoal = useGoalStore((state) => state.updateGoal);
   const { users } = useUserStore();
@@ -33,15 +46,20 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
 
   const [formData, setFormData] = useState({
     id: '',
-    name: '',
-    description: '',
-    startDate: new Date(),
-    targetDate: undefined as Date | undefined,
-    successCriteria: [] as Step[],
+    name: goal.name,
+    description: goal.description,
+    startDate: goal.startDate,
+    targetDate: goal.targetDate,
+    successCriteria: Array.isArray(goal.successCriteria)
+      ? goal.successCriteria.map(criteria => ({
+          ...criteria,
+          stepType: criteria.stepType || 'Tangible'
+        }))
+      : [],
     progress: 0,
-    assignedTo: [] as string[],
-    householdId: '',
-    goalType: 'Tangible' as GoalType
+    assignedTo: goal.assignedTo,
+    householdId: goal.householdId,
+    goalType: goal.goalType
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -85,6 +103,7 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
     const newStep: Step = {
       id: crypto.randomUUID(),
       text: '',
+      stepType: 'Tangible',
       isTracked: false,
       tasks: [],
       notes: []
@@ -251,6 +270,146 @@ export function EditGoalDialog({ goal, open, onClose }: EditGoalDialogProps) {
                           >
                             <TrashIcon className="h-4 w-4" />
                           </Button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-x-6">
+                        <div className="flex items-center gap-x-2">
+                          <input
+                            type="checkbox"
+                            checked={step.isTracked}
+                            onChange={(e) => updateCriteria(index, { 
+                              isTracked: e.target.checked,
+                              timescale: e.target.checked && step.stepType === 'Habit' ? 'weekly' : undefined,
+                              frequency: e.target.checked && step.stepType === 'Habit' ? 1 : undefined,
+                              repeatEndDate: e.target.checked && step.stepType === 'Habit' ? formData.targetDate : undefined
+                            })}
+                            className="h-4 w-4 rounded border-gray-300"
+                          />
+                          <Label className="text-sm text-gray-600">Track in Schedule</Label>
+                        </div>
+                        {step.isTracked && (
+                          <div className="space-y-4 w-full">
+                            {/* Day Selection */}
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium text-gray-700">Select Days</Label>
+                              <div className="flex gap-2">
+                                {['Su', 'M', 'Tu', 'W', 'Th', 'F', 'Sa'].map((day) => (
+                                  <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => {
+                                      const selectedDays = step.selectedDays || [];
+                                      const newSelectedDays = selectedDays.includes(day) 
+                                        ? selectedDays.filter(d => d !== day)
+                                        : [...selectedDays, day];
+                                      updateCriteria(index, { selectedDays: newSelectedDays });
+                                    }}
+                                    className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                                      (step.selectedDays || []).includes(day)
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                    }`}
+                                  >
+                                    {day}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* Time Selection for each selected day */}
+                            {(step.selectedDays || []).map((day) => (
+                              <div key={day} className="space-y-2">
+                                <Label className="text-sm font-medium text-gray-700">{getDayName(day)} Times</Label>
+                                {(step.scheduledTimes?.[day] || []).map((time, timeIndex) => (
+                                  <div key={timeIndex} className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                      <select
+                                        value={time}
+                                        onChange={(e) => {
+                                          const times = { ...(step.scheduledTimes || {}) };
+                                          times[day] = times[day] || [];
+                                          times[day][timeIndex] = e.target.value;
+                                          updateCriteria(index, { scheduledTimes: times });
+                                        }}
+                                        className="w-full rounded-lg border border-gray-300 p-2.5 pl-10 appearance-none bg-white"
+                                      >
+                                        {Array.from({ length: 24 }, (_, i) => (
+                                          <option key={i} value={`${i.toString().padStart(2, '0')}:00`}>
+                                            {`${i.toString().padStart(2, '0')}:00`}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <Clock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        const times = { ...(step.scheduledTimes || {}) };
+                                        times[day] = times[day].filter((_, i) => i !== timeIndex);
+                                        updateCriteria(index, { scheduledTimes: times });
+                                      }}
+                                    >
+                                      <TrashIcon className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const times = { ...(step.scheduledTimes || {}) };
+                                    times[day] = [...(times[day] || []), "09:00"];
+                                    updateCriteria(index, { scheduledTimes: times });
+                                  }}
+                                >
+                                  <PlusIcon className="h-4 w-4 mr-1" /> Add Time
+                                </Button>
+                              </div>
+                            ))}
+
+                            {/* Repeat Settings - Only show for Habit steps */}
+                            {step.stepType === 'Habit' && (
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-medium text-gray-700">Repeat</Label>
+                                  <Select
+                                    value={step.timescale || 'weekly'}
+                                    onValueChange={(value: TimeScale) => updateCriteria(index, { timescale: value })}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="daily">Daily</SelectItem>
+                                      <SelectItem value="weekly">Weekly</SelectItem>
+                                      <SelectItem value="monthly">Monthly</SelectItem>
+                                      <SelectItem value="quarterly">Quarterly</SelectItem>
+                                      <SelectItem value="yearly">Yearly</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label className="text-sm font-medium text-gray-700">Repeat Until</Label>
+                                  <div className="relative">
+                                    <Input
+                                      type="date"
+                                      value={step.repeatEndDate?.toISOString().split('T')[0] || formData.targetDate?.toISOString().split('T')[0] || ''}
+                                      onChange={(e) => updateCriteria(index, { 
+                                        repeatEndDate: e.target.value ? new Date(e.target.value) : formData.targetDate
+                                      })}
+                                      className="w-full pl-10"
+                                    />
+                                    <Calendar className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
 

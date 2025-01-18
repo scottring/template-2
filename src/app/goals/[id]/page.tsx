@@ -170,7 +170,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
             <div className="p-6">
               <h2 className="text-base font-semibold">Steps</h2>
               <ul className="mt-2 space-y-2">
-                {goal.successCriteria.map((step: Step, index: number) => (
+                {goal.steps.map((step: Step, index: number) => (
                   <li key={index} className="flex items-start gap-x-3 text-sm">
                     <div className="relative mt-1 flex h-5 w-5 items-center justify-center">
                       <div className="h-4 w-4 rounded-full border-2" />
