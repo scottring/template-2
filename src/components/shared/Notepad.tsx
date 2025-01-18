@@ -1,24 +1,33 @@
 'use client';
 
 import { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { motion } from 'framer-motion';
 
 export function Notepad({ initialContent = '' }: { initialContent?: string }) {
   const [content, setContent] = useState(initialContent);
 
   return (
-    <div className="overflow-hidden rounded-lg bg-white shadow">
-      <div className="p-6">
-        <h2 className="text-lg font-medium text-gray-900">Notepad</h2>
-        <div className="mt-4">
-          <textarea
+    <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
+      <CardContent className="p-6">
+        <h2 className="text-lg font-semibold bg-gradient-to-r from-primary to-accent-foreground bg-clip-text text-transparent">
+          Notepad
+        </h2>
+        <motion.div 
+          className="mt-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
-            rows={10}
+            className="min-h-[300px] resize-none bg-background/50 border-primary/10 focus:border-primary/20 focus:ring-primary/20 placeholder:text-muted-foreground/50"
             placeholder="Write your notes here..."
           />
-        </div>
-      </div>
-    </div>
+        </motion.div>
+      </CardContent>
+    </Card>
   );
 }
