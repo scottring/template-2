@@ -334,34 +334,115 @@ export default function ReviewPage() {
     );
   }
 
-  const handleStatusUpdate = (item: ReviewItem, newStatus: ReviewItem['status']) => {
-    setSession(prev => {
-      const updatedItems = [...prev.reviewedItems];
-      const existingIndex = updatedItems.findIndex(i => i.id === item.id);
-      
-      if (existingIndex >= 0) {
-        updatedItems[existingIndex] = {
-          ...updatedItems[existingIndex],
-          status: newStatus,
-          wasUpdated: true
-        };
-      } else {
-        updatedItems.push({
-          id: item.id,
+  const handleStatusUpdate = async (item: ReviewItem, newStatus: ReviewItem['status']) => {
+    if (!user?.householdId) return;
+
+    try {
+      // Get the store actions
+      const { addItem, updateItem, items } = useItineraryStore.getState();
+
+      // Check if there's an existing itinerary item for this step/task
+      let existingItem = items.find(i => {
+        if (item.type === 'task') {
+          return i.referenceId === item.id;
+        } else {
+          // For steps, we need to match both the step ID and goal ID
+          return i.criteriaId === item.stepId && 
+                 i.referenceId === item.goalId &&
+                 i.type === item.type;
+        }
+      });
+
+      // Always create a new item if one doesn't exist
+      if (!existingItem) {
+        // Create a new itinerary item
+        const newItem = {
           type: item.type,
-          status: newStatus,
-          originalStatus: item.status,
-          wasUpdated: true,
-          goalId: item.goalId,
-          stepId: item.stepId
-        });
+          referenceId: item.type === 'task' ? item.id : item.goalId!,
+          criteriaId: item.stepId ?? '',
+          notes: item.text,
+          status: newStatus === 'completed' ? ('completed' as const) : ('pending' as const),
+          householdId: user.householdId,
+          createdBy: user.uid,
+          updatedBy: user.uid,
+          schedule: {
+            startDate: new Date(),
+            schedules: [] as { day: number; time: string; }[],
+            repeat: undefined,
+            endDate: undefined
+          }
+        };
+
+        await addItem(newItem);
+      } else {
+        // Update existing item
+        try {
+          await updateItem(existingItem.id, {
+            status: newStatus === 'completed' ? 'completed' : 'pending',
+            updatedBy: user.uid,
+            updatedAt: new Date()
+          });
+        } catch (error) {
+          console.error('Error updating item:', error);
+          // If update fails, create a new item
+          const newItem = {
+            type: item.type,
+            referenceId: item.type === 'task' ? item.id : item.goalId!,
+            criteriaId: item.stepId ?? '',
+            notes: item.text,
+            status: newStatus === 'completed' ? ('completed' as const) : ('pending' as const),
+            householdId: user.householdId,
+            createdBy: user.uid,
+            updatedBy: user.uid,
+            schedule: {
+              startDate: new Date(),
+              schedules: [] as { day: number; time: string; }[],
+              repeat: undefined,
+              endDate: undefined
+            }
+          };
+          await addItem(newItem);
+        }
       }
 
-      return {
-        ...prev,
-        reviewedItems: updatedItems
-      };
-    });
+      // Update the session state
+      setSession(prev => {
+        const updatedItems = [...prev.reviewedItems];
+        const existingIndex = updatedItems.findIndex(i => i.id === item.id);
+        
+        if (existingIndex >= 0) {
+          updatedItems[existingIndex] = {
+            ...updatedItems[existingIndex],
+            status: newStatus,
+            wasUpdated: true
+          };
+        } else {
+          updatedItems.push({
+            id: item.id,
+            type: item.type,
+            status: newStatus,
+            originalStatus: item.status,
+            wasUpdated: true,
+            goalId: item.goalId,
+            stepId: item.stepId
+          });
+        }
+
+        return {
+          ...prev,
+          reviewedItems: updatedItems,
+          insights: {
+            ...prev.insights,
+            completedCount: newStatus === 'completed' ? prev.insights.completedCount + 1 : prev.insights.completedCount,
+            missedCount: newStatus === 'not_started' ? prev.insights.missedCount + 1 : prev.insights.missedCount,
+            updatedCount: prev.insights.updatedCount + 1
+          }
+        };
+      });
+    } catch (error) {
+      console.error('Error updating status:', error);
+      // TODO: Show error toast to user
+    }
   };
 
   const handleReschedule = (item: ReviewItem) => {
@@ -369,17 +450,19 @@ export default function ReviewPage() {
     setScheduleDialogOpen(true);
   };
 
-  const handleScheduleConfirm = (config: any) => {
-    if (!selectedItem || !user) return;
+  const handleScheduleConfirm = async (config: any) => {
+    if (!selectedItem || !user || !user.householdId) return;
 
     // Create a new itinerary item for the rescheduled step
-    const newItem: Partial<ItineraryItem> = {
+    const newItem = {
       type: selectedItem.type,
       referenceId: selectedItem.goalId!,
-      criteriaId: selectedItem.stepId,
+      criteriaId: selectedItem.stepId ?? '',
       notes: selectedItem.text,
-      status: 'pending',
+      status: 'pending' as const,
       householdId: user.householdId,
+      createdBy: user.uid,
+      updatedBy: user.uid,
       schedule: {
         startDate: new Date(),
         schedules: config.schedules,
@@ -388,8 +471,31 @@ export default function ReviewPage() {
       }
     };
 
-    // Add to itinerary
-    // TODO: Call your addItem function here
+    try {
+      // Add to itinerary using the addItem function from useItineraryStore
+      const { addItem } = useItineraryStore.getState();
+      const newId = await addItem(newItem);
+      
+      // Update the session state to reflect the change
+      setSession(prev => ({
+        ...prev,
+        reviewedItems: [
+          ...prev.reviewedItems,
+          {
+            id: newId,
+            type: selectedItem.type,
+            status: 'pending',
+            originalStatus: selectedItem.status,
+            wasUpdated: true,
+            goalId: selectedItem.goalId,
+            stepId: selectedItem.stepId
+          }
+        ]
+      }));
+    } catch (error) {
+      console.error('Error scheduling item:', error);
+      // TODO: Show error toast to user
+    }
 
     setScheduleDialogOpen(false);
     setSelectedItem(null);
