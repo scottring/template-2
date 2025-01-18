@@ -442,7 +442,13 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
                       </div>
                       {step.isTracked && (
                         <div className="space-y-4 w-full">
-                          <StepScheduler step={step} onUpdate={(updates) => updateStep(index, updates)} />
+                          <StepScheduler 
+                            step={step} 
+                            onUpdate={(updates) => {
+                              // Prevent event propagation
+                              updateStep(index, updates);
+                            }} 
+                          />
                         </div>
                       )}
                     </div>
