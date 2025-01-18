@@ -47,6 +47,10 @@ interface JourneyState {
     quarterly: boolean;
     yearly: boolean;
   };
+  
+  // Review management
+  isWeeklyReviewNeeded: () => boolean;
+  markWeeklyReviewComplete: () => void;
 }
 
 const stageOrder: JourneyStage[] = [
@@ -169,6 +173,30 @@ export const useJourneyStore = create<JourneyState>()(
           quarterly: today.getDate() <= 7 && today.getMonth() % 3 === 0, // First week of quarter
           yearly: today.getDate() <= 7 && today.getMonth() === 0 // First week of year
         };
+      },
+
+      isWeeklyReviewNeeded: () => {
+        const { weeklyMeeting } = get();
+        const today = new Date();
+        const lastCompleted = weeklyMeeting.lastCompleted;
+        
+        if (!lastCompleted) return true;
+        
+        const lastCompletedDate = new Date(lastCompleted);
+        const daysSinceLastReview = Math.floor(
+          (today.getTime() - lastCompletedDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        
+        return daysSinceLastReview >= 7;
+      },
+
+      markWeeklyReviewComplete: () => {
+        set(state => ({
+          weeklyMeeting: {
+            ...state.weeklyMeeting,
+            lastCompleted: new Date()
+          }
+        }));
       }
     }),
     { name: 'journey-store' }
