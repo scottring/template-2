@@ -140,7 +140,16 @@ export default function GoalsPage() {
                   Progress: {goal.progress}%
                 </span>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">{goal.description}</p>
+              <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2 mb-4">{goal.description}</p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/goals/${goal.id}`);
+                }}
+                className="w-full inline-flex justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              >
+                View Details
+              </button>
             </div>
           ))}
         </div>
@@ -162,4 +171,4 @@ export default function GoalsPage() {
       )}
     </div>
   );
-} 
+}

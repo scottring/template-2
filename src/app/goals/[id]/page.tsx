@@ -12,6 +12,7 @@ import {
   Share2,
   Target,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import useGoalStore from "@/lib/stores/useGoalStore";
 import { useProjectStore } from "@/lib/stores/useProjectStore";
@@ -21,9 +22,11 @@ import { ShareDialog } from "@/components/shared/ShareDialog";
 import { SharedIndicator } from "@/components/shared/SharedIndicator";
 import { TasksSection } from "@/components/goals/TasksSection";
 import { Notepad } from "@/components/shared/Notepad";
+import { EditGoalDialog } from "@/components/goals/EditGoalDialog";
 
 export default function GoalDetailPage({ params }: { params: { id: string } }) {
   const [isCreateProjectDialogOpen, setIsCreateProjectDialogOpen] = useState(false);
+  const [isEditGoalDialogOpen, setIsEditGoalDialogOpen] = useState(false);
   const [sharingGoal, setSharingGoal] = useState<Goal | null>(null);
   const router = useRouter();
   
@@ -128,6 +131,19 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
                 <Menu.Item>
                   {({ active }) => (
                     <button
+                      onClick={() => setIsEditGoalDialogOpen(true)}
+                      className={`${
+                        active ? 'bg-gray-100' : ''
+                      } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
+                    >
+                      <Pencil className="mr-3 h-5 w-5 text-gray-400" aria-hidden="true" />
+                      Edit
+                    </button>
+                  )}
+                </Menu.Item>
+                <Menu.Item>
+                  {({ active }) => (
+                    <button
                       onClick={() => setSharingGoal(goal)}
                       className={`${
                         active ? 'bg-gray-100' : ''
@@ -217,6 +233,12 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
           <Notepad initialContent="" />
         </div>
       </div>
+
+      <EditGoalDialog
+        open={isEditGoalDialogOpen}
+        onClose={() => setIsEditGoalDialogOpen(false)}
+        goal={goal}
+      />
 
       <CreateProjectDialog
         goalId={goal.id}
