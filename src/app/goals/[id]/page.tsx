@@ -13,6 +13,7 @@ import {
   Target,
   Trash2,
   Pencil,
+  ArrowUpRight,
 } from "lucide-react";
 import useGoalStore from "@/lib/stores/useGoalStore";
 import { useProjectStore } from "@/lib/stores/useProjectStore";
@@ -23,6 +24,11 @@ import { SharedIndicator } from "@/components/shared/SharedIndicator";
 import { TasksSection } from "@/components/goals/TasksSection";
 import { Notepad } from "@/components/shared/Notepad";
 import { EditGoalDialog } from "@/components/goals/EditGoalDialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 export default function GoalDetailPage({ params }: { params: { id: string } }) {
   const [isCreateProjectDialogOpen, setIsCreateProjectDialogOpen] = useState(false);
@@ -75,48 +81,78 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
     return null;
   }
 
-  // Rest of the component remains the same...
+  const container = {
+    hidden: { opacity: 0, height: 0 },
+    show: {
+      opacity: 1,
+      height: 'auto',
+      transition: {
+        when: "beforeChildren",
+        staggerChildren: 0.1,
+      },
+    },
+  };
+
+  const item = {
+    hidden: { opacity: 0, y: 20 },
+    show: { opacity: 1, y: 0 },
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-x-4">
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => router.back()}
-            className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500"
+            className="rounded-full hover:bg-accent/10 transition-colors"
           >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+          </Button>
           <div>
             <div className="flex items-center gap-x-3">
-              <h1 className="text-2xl font-semibold">{goal.name}</h1>
-              <span className={`px-2 py-1 text-sm rounded ${
-                goal.goalType === 'Habit' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-              }`}>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-primary via-accent-foreground to-primary bg-clip-text text-transparent">
+                {goal.name}
+              </h1>
+              <Badge 
+                variant="secondary"
+                className={cn(
+                  "bg-primary/10 text-primary hover:bg-primary/20",
+                  goal.goalType === 'Habit' && "bg-accent/10 text-accent-foreground hover:bg-accent/20"
+                )}
+              >
                 {goal.goalType}
-              </span>
+              </Badge>
             </div>
-            <div className="flex items-center gap-x-2 text-sm text-gray-500">
-              <Calendar className="h-4 w-4" />
-              <span>Due {goal.targetDate?.toLocaleDateString()}</span>
-              <Target className="ml-2 h-4 w-4" />
-              <span>{goal.progress}% complete</span>
+            <div className="flex items-center gap-x-2 text-sm text-muted-foreground mt-1">
+              <div className="flex items-center gap-x-1">
+                <Calendar className="h-4 w-4" />
+                <span>Due {goal.targetDate?.toLocaleDateString()}</span>
+              </div>
+              <span className="text-muted-foreground/30">•</span>
+              <div className="flex items-center gap-x-1">
+                <Target className="h-4 w-4" />
+                <span>{goal.progress}% complete</span>
+              </div>
+              <span className="text-muted-foreground/30">•</span>
               <SharedIndicator sharedWith={goal.assignedTo} />
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-x-2">
-          <button
+          <Button
             onClick={() => setIsCreateProjectDialogOpen(true)}
-            className="inline-flex items-center gap-x-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            className="gap-2 bg-gradient-to-r from-primary to-accent-foreground hover:opacity-90 transition-opacity"
           >
-            <PlusIcon className="-ml-0.5 h-5 w-5" aria-hidden="true" />
+            <PlusIcon className="h-5 w-5" />
             New Project
-          </button>
+          </Button>
 
           <Menu as="div" className="relative">
-            <Menu.Button className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500">
-              <MoreVertical className="h-5 w-5" />
+            <Menu.Button className="rounded-full p-2 hover:bg-accent/10 transition-colors">
+              <MoreVertical className="h-5 w-5 text-muted-foreground" />
             </Menu.Button>
             <Transition
               as={Fragment}
@@ -127,46 +163,51 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
               leaveFrom="transform opacity-100 scale-100"
               leaveTo="transform opacity-0 scale-95"
             >
-              <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                <Menu.Item>
-                  {({ active }) => (
-                    <button
-                      onClick={() => setIsEditGoalDialogOpen(true)}
-                      className={`${
-                        active ? 'bg-gray-100' : ''
-                      } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
-                    >
-                      <Pencil className="mr-3 h-5 w-5 text-gray-400" aria-hidden="true" />
-                      Edit
-                    </button>
-                  )}
-                </Menu.Item>
-                <Menu.Item>
-                  {({ active }) => (
-                    <button
-                      onClick={() => setSharingGoal(goal)}
-                      className={`${
-                        active ? 'bg-gray-100' : ''
-                      } flex w-full items-center px-4 py-2 text-sm text-gray-700`}
-                    >
-                      <Share2 className="mr-3 h-5 w-5 text-gray-400" aria-hidden="true" />
-                      Share
-                    </button>
-                  )}
-                </Menu.Item>
-                <Menu.Item>
-                  {({ active }) => (
-                    <button
-                      onClick={handleDeleteGoal}
-                      className={`${
-                        active ? 'bg-gray-100' : ''
-                      } flex w-full items-center px-4 py-2 text-sm text-red-700`}
-                    >
-                      <Trash2 className="mr-3 h-5 w-5 text-red-400" aria-hidden="true" />
-                      Delete
-                    </button>
-                  )}
-                </Menu.Item>
+              <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-lg bg-card border border-border shadow-lg focus:outline-none">
+                <div className="py-1">
+                  <Menu.Item>
+                    {({ active }) => (
+                      <button
+                        onClick={() => setIsEditGoalDialogOpen(true)}
+                        className={cn(
+                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
+                          active ? "bg-accent/5 text-accent-foreground" : "text-muted-foreground"
+                        )}
+                      >
+                        <Pencil className="mr-3 h-4 w-4" />
+                        Edit
+                      </button>
+                    )}
+                  </Menu.Item>
+                  <Menu.Item>
+                    {({ active }) => (
+                      <button
+                        onClick={() => setSharingGoal(goal)}
+                        className={cn(
+                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
+                          active ? "bg-accent/5 text-accent-foreground" : "text-muted-foreground"
+                        )}
+                      >
+                        <Share2 className="mr-3 h-4 w-4" />
+                        Share
+                      </button>
+                    )}
+                  </Menu.Item>
+                  <Menu.Item>
+                    {({ active }) => (
+                      <button
+                        onClick={handleDeleteGoal}
+                        className={cn(
+                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
+                          active ? "bg-destructive/10 text-destructive" : "text-destructive/80"
+                        )}
+                      >
+                        <Trash2 className="mr-3 h-4 w-4" />
+                        Delete
+                      </button>
+                    )}
+                  </Menu.Item>
+                </div>
               </Menu.Items>
             </Transition>
           </Menu>
@@ -175,56 +216,90 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="space-y-6">
-          <div className="overflow-hidden rounded-lg border bg-white shadow">
-            <div className="p-6">
-              <h2 className="text-base font-semibold">Description</h2>
-              <p className="mt-2 text-sm text-gray-600">{goal.description}</p>
-            </div>
-          </div>
+          <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
+            <CardContent className="p-6">
+              <h2 className="text-lg font-semibold bg-gradient-to-r from-primary to-accent-foreground bg-clip-text text-transparent mb-4">
+                Description
+              </h2>
+              <p className="text-muted-foreground">{goal.description}</p>
+            </CardContent>
+          </Card>
 
-          <div className="overflow-hidden rounded-lg border bg-white shadow">
-            <div className="p-6">
-              <h2 className="text-base font-semibold">Steps</h2>
-              <ul className="mt-2 space-y-2">
+          <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
+            <CardContent className="p-6">
+              <h2 className="text-lg font-semibold bg-gradient-to-r from-primary to-accent-foreground bg-clip-text text-transparent mb-4">
+                Steps
+              </h2>
+              <motion.ul 
+                className="mt-2 space-y-3"
+                variants={container}
+                initial="hidden"
+                animate="show"
+              >
                 {goal.steps.map((step: Step, index: number) => (
-                  <li key={index} className="flex items-start gap-x-3 text-sm">
+                  <motion.li 
+                    key={index} 
+                    variants={item}
+                    className="group flex items-start gap-x-3 text-sm"
+                  >
                     <div className="relative mt-1 flex h-5 w-5 items-center justify-center">
-                      <div className="h-4 w-4 rounded-full border-2" />
+                      <div className="h-4 w-4 rounded-full border-2 border-primary/20 group-hover:border-primary/40 transition-colors" />
                     </div>
-                    <span className="text-gray-600">{step.text}</span>
-                  </li>
+                    <span className="text-muted-foreground group-hover:text-foreground transition-colors">
+                      {step.text}
+                    </span>
+                  </motion.li>
                 ))}
-              </ul>
-            </div>
-          </div>
+              </motion.ul>
+            </CardContent>
+          </Card>
 
-          <div className="overflow-hidden rounded-lg border bg-white shadow">
-            <div className="p-6">
-              <h2 className="text-base font-semibold">Projects</h2>
-              <div className="mt-2 space-y-2">
+          <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
+            <CardContent className="p-6">
+              <h2 className="text-lg font-semibold bg-gradient-to-r from-primary to-accent-foreground bg-clip-text text-transparent mb-4">
+                Projects
+              </h2>
+              <motion.div 
+                className="space-y-3"
+                variants={container}
+                initial="hidden"
+                animate="show"
+              >
                 {goalProjects.map((project) => (
-                  <div
+                  <motion.div
                     key={project.id}
-                    className="flex items-center justify-between rounded-md border bg-white p-4 shadow-sm"
+                    variants={item}
+                    className="group flex items-center justify-between rounded-lg border border-transparent hover:border-accent/20 bg-accent/5 hover:bg-accent/10 p-4 transition-all duration-200"
                   >
                     <div>
-                      <h3 className="font-medium">{project.name}</h3>
-                      <p className="text-sm text-gray-500">{project.description}</p>
+                      <h3 className="font-medium text-foreground/90 group-hover:text-foreground transition-colors">
+                        {project.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground group-hover:text-muted-foreground/80 transition-colors">
+                        {project.description}
+                      </p>
                     </div>
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => router.push(`/projects/${project.id}`)}
-                      className="rounded-md bg-white px-2.5 py-1.5 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50"
+                      className="text-muted-foreground/50 hover:text-primary transition-colors opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200"
                     >
-                      View
-                    </button>
-                  </div>
+                      <ArrowUpRight className="h-5 w-5" />
+                    </Button>
+                  </motion.div>
                 ))}
                 {goalProjects.length === 0 && (
-                  <p className="text-sm text-gray-500">No projects yet</p>
+                  <motion.p 
+                    variants={item}
+                    className="text-muted-foreground text-center py-8"
+                  >
+                    No projects yet
+                  </motion.p>
                 )}
-              </div>
-            </div>
-          </div>
+              </motion.div>
+            </CardContent>
+          </Card>
 
           <TasksSection goalId={goal.id} />
         </div>
