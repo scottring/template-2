@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { WeeklyReview } from '@/app/components/WeeklyReview';
+import { FlowReview } from '@/app/components/FlowReview';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,15 +13,53 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import useGoalStore from '@/lib/stores/useGoalStore';
+import useItineraryStore from '@/lib/stores/useItineraryStore';
+import useTaskStore from '@/lib/stores/useTaskStore';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { ScheduleDialog } from "@/components/planning/ScheduleDialog";
+import { ItineraryItem } from '@/types/models';
 
 export default function ReviewPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [isStarted, setIsStarted] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<ItineraryItem | null>(null);
+
+  const { goals, loading: goalsLoading } = useGoalStore();
+  const { items, loading: itemsLoading } = useItineraryStore();
+  const { tasks, loading: tasksLoading } = useTaskStore();
 
   const handleComplete = () => {
     router.push('/dashboard');
   };
+
+  const handleRescheduleItem = (item: ItineraryItem) => {
+    setSelectedItem(item);
+    setScheduleDialogOpen(true);
+  };
+
+  const handleScheduleConfirm = async (newSchedule: any) => {
+    // Handle rescheduling logic here
+    setScheduleDialogOpen(false);
+    setSelectedItem(null);
+  };
+
+  if (goalsLoading || itemsLoading || tasksLoading) {
+    return (
+      <div className="container mx-auto py-8">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center min-h-[200px]">
+              <p className="text-muted-foreground">Loading...</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!isStarted) {
     return (
@@ -73,10 +111,27 @@ export default function ReviewPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <WeeklyReview 
-        onComplete={handleComplete} 
+      <FlowReview 
         selectedDate={selectedDate}
+        goals={goals}
+        items={items}
+        tasks={tasks}
+        onComplete={handleComplete}
+        onRescheduleItem={handleRescheduleItem}
       />
+
+      {selectedItem && (
+        <ScheduleDialog
+          open={scheduleDialogOpen}
+          onClose={() => {
+            setScheduleDialogOpen(false);
+            setSelectedItem(null);
+          }}
+          onSchedule={handleScheduleConfirm}
+          itemName={selectedItem.notes || ''}
+          targetDate={selectedItem.schedule?.startDate}
+        />
+      )}
     </div>
   );
 } 
