@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import useGoalStore from '@/lib/stores/useGoalStore';
 import { Goal } from '@/types/models';
 import { useRouter } from 'next/navigation';
-import { PlusIcon, Share2, Trash2, Target, Calendar, ArrowUpRight, Loader2 } from 'lucide-react';
+import { PlusIcon, Share2, Trash2, Target, Calendar, ArrowUpRight, Loader2, Plus } from 'lucide-react';
 import { CreateGoalDialog } from '@/components/goals/CreateGoalDialog';
 import { ShareDialog } from '@/components/shared/ShareDialog';
 import { SharedIndicator } from '@/components/shared/SharedIndicator';
@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { FlowCreator } from '@/app/components/FlowCreator';
 
 const container: Variants = {
   hidden: { opacity: 0 },
@@ -34,11 +35,12 @@ export default function GoalsPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [sharingGoal, setSharingGoal] = useState<Goal | null>(null);
   
   const goals = useGoalStore(state => state.goals);
   const fetchGoals = useGoalStore(state => state.fetchGoals);
+  const { addGoal } = useGoalStore();
   
   useEffect(() => {
     if (!user?.householdId) {
@@ -60,6 +62,52 @@ export default function GoalsPage() {
     loadGoals();
   }, [user?.householdId, fetchGoals]);
 
+  const handleCreateGoal = async (data: any) => {
+    if (!user?.householdId) return;
+
+    const goal: Goal = {
+      id: '', // This will be set by Firebase
+      name: data.name,
+      description: data.description,
+      areaId: '', // This should be selected in the flow or set to default
+      startDate: new Date(),
+      targetDate: data.targetDate,
+      progress: 0,
+      goalType: 'Tangible',
+      status: 'in_progress',
+      steps: data.steps.map((step: any) => ({
+        id: '', // This will be set when adding to Firebase
+        text: step.text,
+        stepType: step.stepType,
+        isTracked: true,
+        frequency: step.frequency,
+        targetDate: step.targetDate,
+        tasks: [],
+        notes: []
+      })),
+      assignedTo: [user.uid],
+      householdId: user.householdId,
+      createdBy: user.uid,
+      updatedBy: user.uid,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    await addGoal(goal);
+    setIsCreating(false);
+  };
+
+  if (isCreating) {
+    return (
+      <div className="container mx-auto py-8">
+        <FlowCreator 
+          onComplete={handleCreateGoal}
+          onCancel={() => setIsCreating(false)}
+        />
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -75,9 +123,12 @@ export default function GoalsPage() {
           <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
             Goals
           </h1>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <PlusIcon className="h-4 w-4 mr-2" />
-            New Goal
+          <Button
+            onClick={() => setIsCreating(true)}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Create Goal
           </Button>
         </div>
 
@@ -153,10 +204,10 @@ export default function GoalsPage() {
                     </p>
                   </div>
                   <Button
-                    onClick={() => setIsCreateDialogOpen(true)}
+                    onClick={() => setIsCreating(true)}
                     className="mt-4"
                   >
-                    <PlusIcon className="h-4 w-4 mr-2" />
+                    <Plus className="h-4 w-4 mr-2" />
                     Create Goal
                   </Button>
                 </div>
@@ -166,11 +217,6 @@ export default function GoalsPage() {
         </motion.div>
       </div>
 
-      <CreateGoalDialog
-        open={isCreateDialogOpen}
-        onClose={() => setIsCreateDialogOpen(false)}
-      />
-      
       {sharingGoal && (
         <ShareDialog
           open={!!sharingGoal}
