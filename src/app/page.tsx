@@ -39,7 +39,7 @@ export default function OnboardingPage() {
         <div className="text-center">
           <h1 className="text-4xl font-bold tracking-tight">Welcome!</h1>
           <p className="mt-2 text-lg text-muted-foreground">
-            Let's start by creating your first area
+            Let&#39;s start by creating your first area
           </p>
         </div>
 

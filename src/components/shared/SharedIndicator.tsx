@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 import { Popover, Transition } from '@headlessui/react';
 import { Users } from 'lucide-react';
 import { useUserStore } from '@/lib/stores/useUserStore';
+import Image from 'next/image';
 
 interface SharedIndicatorProps {
   sharedWith: string[];
@@ -40,10 +41,12 @@ export function SharedIndicator({ sharedWith }: SharedIndicatorProps) {
                 {sharedMembers.map((member) => (
                   <div key={member.id} className="flex items-center gap-x-3 py-2">
                     {member.photoURL ? (
-                      <img
+                      <Image
                         src={member.photoURL}
                         alt={member.displayName}
-                        className="h-6 w-6 flex-none rounded-full bg-gray-50"
+                        width={24}
+                        height={24}
+                        className="flex-none rounded-full bg-gray-50"
                       />
                     ) : (
                       <div className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-blue-100 text-xs font-medium text-blue-600">

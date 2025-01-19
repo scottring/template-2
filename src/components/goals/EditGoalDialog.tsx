@@ -238,7 +238,9 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
         <DialogHeader>
           <DialogTitle className="text-2xl">Edit Goal</DialogTitle>
           <DialogDescription>
-            Make changes to your goal and its steps. Click save when you're done.
+            <p className="text-muted-foreground">
+              Let&apos;s update your goal.
+            </p>
           </DialogDescription>
         </DialogHeader>
         

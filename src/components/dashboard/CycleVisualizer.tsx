@@ -55,7 +55,7 @@ export function CycleVisualizer() {
     if (goals.length === 0) return 'onboarding';
     if (tasks.some(t => t.status === 'completed')) return 'tracking';
     if (tasks.length > 0) return 'daily';
-    if (goals.some(g => g.successCriteria.length > 0)) return 'planning';
+    if (goals.some(g => g.steps && g.steps.length > 0)) return 'planning';
     return 'reflection';
   };
 

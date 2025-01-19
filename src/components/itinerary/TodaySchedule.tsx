@@ -8,6 +8,8 @@ import { Goal, Step } from '@/types/models';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { Checkbox } from '@/components/ui/checkbox';
+import Link from 'next/link';
 
 interface TodayScheduleProps {
   date: Date;
@@ -33,60 +35,45 @@ export function TodaySchedule({ date }: TodayScheduleProps) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Today's Schedule</h2>
+      <h2 className="text-lg font-semibold">Today&apos;s Schedule</h2>
       {items.length === 0 ? (
-        <p className="text-muted-foreground">No items scheduled for today</p>
+        <p className="text-muted-foreground">
+          You don&apos;t have any activities scheduled for today.
+        </p>
       ) : (
         <ul className="space-y-2">
           {items.map(item => {
             const goal = goals.find(g => g.id === item.referenceId);
-            const step = goal?.steps?.find(s => s.id === item.criteriaId);
+            const step = goal?.steps?.find(s => s.id === item.stepId);
             
             return (
               <li key={item.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-accent">
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => handleComplete(item.id)}
-                    className="text-muted-foreground hover:text-primary"
-                  >
-                    {item.status === 'completed' ? (
-                      <CheckCircle2 className="w-5 h-5" />
-                    ) : (
-                      <Circle className="w-5 h-5" />
-                    )}
-                  </button>
-                  
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={item.status === 'completed'}
+                    onCheckedChange={(checked) => {
+                      if (checked && user) {
+                        completeItem(item.id, user.uid);
+                      }
+                    }}
+                  />
                   <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium">
-                        {goal?.name}
-                      </span>
-                    </div>
-                    {step && (
-                      <span className="text-sm text-muted-foreground">
-                        - {step.text}
-                      </span>
-                    )}
-                    
-                    {item.schedule?.repeat && (
-                      <div className="text-sm text-muted-foreground">
-                        Every {item.schedule.repeat}
-                        {getStreak(item.id) > 0 && (
-                          <span className="ml-2">
-                            🔥 {getStreak(item.id)} day streak
-                          </span>
-                        )}
-                      </div>
+                    <p className="font-medium">{step?.text || item.notes}</p>
+                    {goal && (
+                      <Link 
+                        href={`/goals/${goal.id}`}
+                        className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                      >
+                        {goal.name}
+                      </Link>
                     )}
                   </div>
                 </div>
-
-                <button
-                  onClick={() => router.push(`/goals/${goal?.id}`)}
-                  className="text-muted-foreground hover:text-primary"
-                >
-                  <ArrowUpRight className="w-5 h-5" />
-                </button>
+                {item.schedule?.schedules.map(schedule => (
+                  <span key={`${schedule.day}-${schedule.time}`} className="text-sm text-muted-foreground">
+                    {schedule.time}
+                  </span>
+                ))}
               </li>
             );
           })}

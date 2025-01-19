@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
+import useTaskStore from '@/lib/stores/useTaskStore';
 import { useHouseholdStore } from '@/lib/stores/useHouseholdStore';
 import { Task } from '@/types/models';
 import { format, isToday, isTomorrow, addDays, isBefore } from 'date-fns';

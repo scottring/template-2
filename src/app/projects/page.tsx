@@ -5,17 +5,30 @@ import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
 import { Project } from '@/types/models';
 import { useRouter } from 'next/navigation';
-import { Share2 } from 'lucide-react';
+import { Share2, Loader2 } from 'lucide-react';
 import { SharedIndicator } from '@/components/shared/SharedIndicator';
 import { ShareDialog } from '@/components/shared/ShareDialog';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { motion } from 'framer-motion';
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [sharingProject, setSharingProject] = useState<Project | null>(null);
   const router = useRouter();
+  const { user } = useAuth();
 
   useEffect(() => {
-    const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'));
+    if (!user?.householdId) {
+      setIsLoading(false);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'projects'), 
+      orderBy('createdAt', 'desc')
+    );
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const projects = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -26,75 +39,68 @@ export default function ProjectsPage() {
         endDate: doc.data().endDate?.toDate(),
       })) as Project[];
       setProjects(projects);
+      setIsLoading(false);
+    }, (error) => {
+      console.error('Error fetching projects:', error);
+      setIsLoading(false);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      unsubscribe();
+      setIsLoading(true);
+    };
+  }, [user?.householdId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Projects</h1>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+          Projects
+        </h1>
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {projects.map((project) => (
-          <div
+          <motion.div
             key={project.id}
-            className="relative flex flex-col overflow-hidden rounded-lg border bg-white shadow-sm"
+            className="relative flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm backdrop-blur-sm bg-background/95"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={() => router.push(`/projects/${project.id}`)}
           >
             <div className="p-6">
               <div className="flex items-center gap-x-3">
-                <h3 className="text-lg font-semibold text-gray-900">{project.name}</h3>
+                <h3 className="text-lg font-semibold">{project.name}</h3>
                 <SharedIndicator sharedWith={project.assignedTo} />
               </div>
-              <p className="mt-2 text-sm text-gray-500">{project.description}</p>
+              <p className="mt-2 text-sm text-muted-foreground">{project.description}</p>
               <div className="mt-4">
-                <div className="flex items-center justify-between text-sm text-gray-500">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
                   <p>
-                    {project.startDate.toLocaleDateString()} - {project.endDate.toLocaleDateString()}
+                    {project.startDate?.toLocaleDateString()} - {project.endDate?.toLocaleDateString()}
                   </p>
                 </div>
               </div>
             </div>
-            <div className="mt-auto flex divide-x border-t">
-              <button
-                type="button"
-                onClick={() => router.push(`/projects/${project.id}`)}
-                className="flex w-full items-center justify-center gap-x-2.5 p-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-              >
-                View Details
-              </button>
-              <button
-                type="button"
-                onClick={() => setSharingProject(project)}
-                className="flex w-full items-center justify-center gap-x-2.5 p-3 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-              >
-                <Share2 className="h-4 w-4" />
-                Share
-              </button>
-            </div>
-          </div>
+          </motion.div>
         ))}
-
-        {projects.length === 0 && (
-          <div className="col-span-full flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 text-center">
-            <h3 className="mt-2 text-sm font-semibold text-gray-900">
-              No projects yet
-            </h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Projects will appear here when you create them from a goal.
-            </p>
-          </div>
-        )}
       </div>
 
       {sharingProject && (
         <ShareDialog
-          open={true}
+          open={!!sharingProject}
           onClose={() => setSharingProject(null)}
-          itemType="projects"
           itemId={sharingProject.id}
+          itemType="project"
           itemName={sharingProject.name}
         />
       )}

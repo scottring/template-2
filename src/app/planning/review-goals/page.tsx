@@ -31,7 +31,7 @@ export default function ReviewGoalsPage() {
         <Card className="p-6 mb-6 border-l-4 border-l-blue-600">
           <h2 className="text-xl font-semibold mb-4">Yearly Goals Review</h2>
           <p className="text-gray-600 mb-4">
-            It's the start of a new year! Take time to review and adjust your yearly goals.
+            It&apos;s the start of a new year! Take time to review and adjust your yearly goals.
           </p>
           {/* Yearly goals list will go here */}
         </Card>
@@ -51,7 +51,7 @@ export default function ReviewGoalsPage() {
         <Card className="p-6 mb-6 border-l-4 border-l-green-600">
           <h2 className="text-xl font-semibold mb-4">Monthly Goals Review</h2>
           <p className="text-gray-600 mb-4">
-            It's a new month! Review your monthly goals and align them with your longer-term vision.
+            It&apos;s a new month! Review your monthly goals and align them with your longer-term vision.
           </p>
           {/* Monthly goals list will go here */}
         </Card>
@@ -65,6 +65,10 @@ export default function ReviewGoalsPage() {
         </p>
         {/* Weekly goals list will go here */}
       </Card>
+
+      <p className="text-muted-foreground">
+        Let&apos;s review your goals and progress.
+      </p>
     </div>
   );
 } 

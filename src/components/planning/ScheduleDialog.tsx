@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { TimeScale } from '@/types/models';
 import { format } from 'date-fns';
+import { Label } from '@/components/ui/label';
 
 export interface ScheduleConfig {
   schedules: Array<{ day: number; time: string }>;
@@ -121,7 +122,7 @@ export function ScheduleDialog({ open, onClose, onSchedule, itemName, targetDate
         <DialogHeader>
           <DialogTitle>Schedule Item</DialogTitle>
           <DialogDescription>
-            Choose when and how often "{itemName}" should occur.
+            Choose when and how often &quot;{itemName}&quot; should occur.
           </DialogDescription>
         </DialogHeader>
 
@@ -187,6 +188,10 @@ export function ScheduleDialog({ open, onClose, onSchedule, itemName, targetDate
               </p>
             )}
           </div>
+
+          <Label htmlFor="repeat">
+            Select &quot;Repeat&quot; to make this a recurring activity
+          </Label>
         </div>
 
         <DialogFooter>

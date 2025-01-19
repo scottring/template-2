@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useUserStore } from '@/lib/stores/useUserStore';
 import { FormError } from '@/components/error/FormError';
 import { UserPlus, UserMinus, Share2 } from 'lucide-react';
@@ -82,9 +83,11 @@ export function FamilyManagement() {
           >
             <div className="flex items-center min-w-0 gap-x-4">
               {member.photoURL ? (
-                <img
+                <Image
                   src={member.photoURL}
-                  alt={member.displayName}
+                  alt={`${member.displayName}'s profile photo`}
+                  width={40}
+                  height={40}
                   className="h-12 w-12 flex-none rounded-full bg-gray-50"
                 />
               ) : (
@@ -116,4 +119,4 @@ export function FamilyManagement() {
       </div>
     </div>
   );
-} 
+}

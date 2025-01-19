@@ -5,6 +5,7 @@ import Link, { LinkProps } from "next/link";
 import React, { useState } from "react";
 import { Menu, LogOut, X } from "lucide-react";
 import { useAuth } from "@/lib/contexts/AuthContext";
+import Image from "next/image";
 
 interface Links {
   label: string;
@@ -117,10 +118,12 @@ const UserProfile = () => {
     <div className="mt-auto pt-4 border-t">
       <div className="flex items-center gap-x-3 px-4 py-3">
         {user.photoURL ? (
-          <img
+          <Image
             src={user.photoURL}
             alt={user.displayName || 'User avatar'}
-            className="h-8 w-8 rounded-full"
+            width={32}
+            height={32}
+            className="rounded-full"
           />
         ) : (
           <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-medium">

@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { doc, onSnapshot, query, collection, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase/firebase';
-import { Area, Goal, SuccessCriteria } from '@/types/models';
+import { Area, Goal } from '@/types/models';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, PlusIcon, MoreVertical } from 'lucide-react';
 import useGoalStore from '@/lib/stores/useGoalStore';
@@ -169,16 +169,6 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
                   {goal.progress}% complete
                 </p>
               </div>
-              <div className="mt-4">
-                <h4 className="text-sm font-medium text-gray-900">Success Criteria:</h4>
-                <ul className="mt-2 space-y-1">
-                  {goal.successCriteria.map((criteria: SuccessCriteria, index: number) => (
-                    <li key={`${goal.id}-${criteria.text}-${index}`} className="text-sm text-gray-500">
-                      • {criteria.text}
-                    </li>
-                  ))}
-                </ul>
-              </div>
             </div>
             <div className="mt-auto flex divide-x border-t">
               <button
@@ -213,9 +203,9 @@ export default function AreaDetailPage({ params }: { params: { id: string } }) {
       </div>
 
       <CreateGoalDialog
-        areaId={area.id}
         open={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
+        defaultAreaId={area.id}
       />
 
       {editingGoal && (

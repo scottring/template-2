@@ -132,9 +132,9 @@ function ReviewItemCard({ item, onStatusUpdate, onReschedule }: ReviewItemCompon
       {item.type === 'habit' && item.completionCount !== undefined && item.targetCount && (
         <div className="mt-4 p-4 bg-muted/50 rounded-lg">
           {item.completionCount === 0 ? (
-            <p>You haven't completed this habit this week. Would you like to adjust the schedule to make it more achievable?</p>
+            <p>You haven&apos;t completed this habit this week. Would you like to adjust the schedule to make it more achievable?</p>
           ) : item.completionCount < item.targetCount ? (
-            <p>You completed this {item.completionCount} time{item.completionCount !== 1 ? 's' : ''} this week. Let's aim for {item.targetCount} times next week!</p>
+            <p>You completed this {item.completionCount} time{item.completionCount !== 1 ? 's' : ''} this week. Let&apos;s aim for {item.targetCount} times next week!</p>
           ) : (
             <p>Great job! You met your goal of {item.targetCount} times this week!</p>
           )}
@@ -240,11 +240,11 @@ export default function ReviewPage() {
 
     // Group completed items by step
     const completedByStep = items.reduce((acc, item) => {
-      if (item.status === 'completed' && item.criteriaId) {
-        if (!acc[item.criteriaId]) {
-          acc[item.criteriaId] = [];
+      if (item.status === 'completed' && item.stepId) {
+        if (!acc[item.stepId]) {
+          acc[item.stepId] = [];
         }
-        acc[item.criteriaId].push(item);
+        acc[item.stepId].push(item);
       }
       return acc;
     }, {} as Record<string, ItineraryItem[]>);
@@ -347,7 +347,7 @@ export default function ReviewPage() {
           return i.referenceId === item.id;
         } else {
           // For steps, we need to match both the step ID and goal ID
-          return i.criteriaId === item.stepId && 
+          return i.stepId === item.stepId && 
                  i.referenceId === item.goalId &&
                  i.type === item.type;
         }
@@ -359,7 +359,7 @@ export default function ReviewPage() {
         const newItem = {
           type: item.type,
           referenceId: item.type === 'task' ? item.id : item.goalId!,
-          criteriaId: item.stepId ?? '',
+          stepId: item.stepId ?? '',
           notes: item.text,
           status: newStatus === 'completed' ? ('completed' as const) : ('pending' as const),
           householdId: user.householdId,
@@ -388,7 +388,7 @@ export default function ReviewPage() {
           const newItem = {
             type: item.type,
             referenceId: item.type === 'task' ? item.id : item.goalId!,
-            criteriaId: item.stepId ?? '',
+            stepId: item.stepId ?? '',
             notes: item.text,
             status: newStatus === 'completed' ? ('completed' as const) : ('pending' as const),
             householdId: user.householdId,
@@ -457,7 +457,7 @@ export default function ReviewPage() {
     const newItem = {
       type: selectedItem.type,
       referenceId: selectedItem.goalId!,
-      criteriaId: selectedItem.stepId ?? '',
+      stepId: selectedItem.stepId ?? '',
       notes: selectedItem.text,
       status: 'pending' as const,
       householdId: user.householdId,
@@ -575,7 +575,7 @@ export default function ReviewPage() {
             {session.step === 'tasks' && (
               <div className="space-y-4">
                 <p className="text-muted-foreground">
-                  Check which tasks you've completed and which ones need attention.
+                  Check which tasks you&apos;ve completed and which ones need attention.
                 </p>
                 <div className="grid gap-6">
                   {currentItems.map((item) => (

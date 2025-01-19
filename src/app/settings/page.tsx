@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useSettingsStore } from '@/lib/stores/useSettingsStore';
 import { useHouseholdStore } from '@/lib/stores/useHouseholdStore';
 import { Copy, UserPlus, UserX } from 'lucide-react';
+import Image from 'next/image';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -138,10 +139,12 @@ export default function SettingsPage() {
             <div key={member.userId} className="flex items-center justify-between py-2">
               <div className="flex items-center space-x-3">
                 {member.photoURL && (
-                  <img
+                  <Image
                     src={member.photoURL}
                     alt={member.displayName}
-                    className="w-8 h-8 rounded-full"
+                    width={32}
+                    height={32}
+                    className="rounded-full"
                   />
                 )}
                 <div>

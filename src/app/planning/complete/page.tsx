@@ -39,7 +39,7 @@ export default function CompletePlanningPage() {
           <div className="space-y-2">
             <h2 className="text-xl font-semibold">Ready to Start Your Week?</h2>
             <p className="text-gray-600">
-              You've completed your planning session. All tasks are distributed and schedules are set.
+              You&#39;ve completed your planning session. All tasks are distributed and schedules are set.
               Your week will start from {startDate.toLocaleDateString()}.
             </p>
           </div>
@@ -76,4 +76,4 @@ export default function CompletePlanningPage() {
       </Card>
     </div>
   );
-} 
+}

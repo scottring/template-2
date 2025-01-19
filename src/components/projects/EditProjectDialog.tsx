@@ -25,16 +25,15 @@ export function EditProjectDialog({ project, open, onClose }: EditProjectDialogP
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (project) {
-      setFormData({
-        name: project.name,
-        description: project.description,
-        startDate: project.startDate,
-        endDate: project.endDate,
-        progress: project.progress,
-        assignedTo: project.assignedTo,
-      });
-    }
+    if (!project) return;
+    setFormData({
+      name: project.name,
+      description: project.description,
+      startDate: project.startDate ? new Date(project.startDate) : new Date(),
+      endDate: project.endDate ? new Date(project.endDate) : new Date(),
+      progress: project.progress,
+      assignedTo: project.assignedTo,
+    });
   }, [project]);
 
   const handleSubmit = async (e: React.FormEvent) => {

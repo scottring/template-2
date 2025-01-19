@@ -11,6 +11,7 @@ import { CheckCircle2, XCircle } from 'lucide-react';
 
 interface WeeklyReviewProps {
   onComplete: () => void;
+  selectedDate: Date;
 }
 
 interface ReviewStats {
@@ -20,15 +21,15 @@ interface ReviewStats {
   completedTasks: number;
 }
 
-export function WeeklyReview({ onComplete }: WeeklyReviewProps) {
+export function WeeklyReview({ onComplete, selectedDate }: WeeklyReviewProps) {
   const { user } = useAuth();
   const { items, loadItems, updateItem } = useItineraryStore();
   const { goals, fetchGoals } = useGoalStore();
   const { weeklyMeeting, markWeeklyReviewComplete } = useJourneyStore();
   
   const [loading, setLoading] = useState(true);
-  const [weekStart] = useState(() => startOfWeek(new Date()));
-  const [weekEnd] = useState(() => endOfWeek(new Date()));
+  const [weekStart] = useState(() => startOfWeek(selectedDate));
+  const [weekEnd] = useState(() => endOfWeek(selectedDate));
   const [reviewItems, setReviewItems] = useState<{
     habits: ItineraryItem[];
     tasks: ItineraryItem[];
@@ -112,7 +113,7 @@ export function WeeklyReview({ onComplete }: WeeklyReviewProps) {
         <CardHeader>
           <CardTitle>Weekly Review</CardTitle>
           <CardDescription>
-            Let's review your progress for the week of {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d')}
+            Let&#39;s review your progress for the week of {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -268,4 +269,4 @@ export function WeeklyReview({ onComplete }: WeeklyReviewProps) {
       </Card>
     </div>
   );
-} 
+}

@@ -60,7 +60,7 @@ export function JourneyTimeline({ currentStage, onStageClick }: JourneyTimelineP
     <div className="w-full max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
       <h2 className="text-2xl font-bold text-gray-900 mb-4">Your Household Journey</h2>
       <p className="text-gray-600 mb-8">
-        Track your household's progress through the goal achievement cycle. Each stage represents a key phase in your journey:
+        Track your household&apos;s progress through the goal achievement cycle. Each stage represents a key phase in your journey:
       </p>
 
       <div className="relative">
