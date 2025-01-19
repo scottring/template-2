@@ -46,8 +46,9 @@ const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Areas', href: '/areas', icon: Folder },
   { name: 'Goals', href: '/goals', icon: Target },
+  { name: 'Plan', href: '/planning', icon: CalendarDays },
   { name: 'Track', href: '/track', icon: ClipboardList },
-  { name: 'Review & Plan', href: '/review', icon: CalendarDays },
+  { name: 'Review', href: '/review', icon: CalendarRange },
   { name: 'Family', href: '/family', icon: Users },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
