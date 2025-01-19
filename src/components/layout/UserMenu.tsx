@@ -5,6 +5,7 @@ import { Menu, Transition } from '@headlessui/react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/contexts/AuthContext';
 import { Settings, LogOut } from 'lucide-react';
+import Image from 'next/image';
 
 export function UserMenu() {
   const { user, signOut } = useAuth();
@@ -25,13 +26,15 @@ export function UserMenu() {
     <Menu as="div" className="relative">
       <Menu.Button className="flex items-center gap-x-4 rounded-full bg-white p-2 text-sm font-semibold leading-6 text-gray-900 shadow-sm ring-1 ring-gray-900/10 hover:ring-gray-900/20">
         {user.photoURL ? (
-          <img
+          <Image
             src={user.photoURL}
             alt={user.displayName || 'User avatar'}
-            className="h-8 w-8 rounded-full bg-gray-50"
+            width={32}
+            height={32}
+            className="rounded-full bg-gray-50"
           />
         ) : (
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white">
+          <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center text-white">
             {user.displayName?.[0] || user.email?.[0] || 'U'}
           </div>
         )}

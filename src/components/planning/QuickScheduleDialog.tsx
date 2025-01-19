@@ -284,21 +284,21 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
         await addItem({
           type: criterion.stepType === 'Habit' ? 'habit' : 'tangible',
           referenceId: goalResult,
-          criteriaId: criterion.id,
+          stepId: criterion.id,
           schedule: {
             startDate: criterion.startDateTime || new Date(startDate),
             endDate: criterion.repeatEndDate,
             repeat: criterion.timescale,
-            schedules: criterion.selectedDays?.map(day => ({
-              day: DAYS_OF_WEEK.indexOf(day),
-              time: '09:00' // Default time if none specified
-            })) || []
+            schedules: criterion.scheduledTimes ? 
+              Object.entries(criterion.scheduledTimes).flatMap(([day, times]) =>
+                times.map(time => ({ day: parseInt(day), time }))
+              ) : []
           },
           status: 'pending',
           notes: criterion.text,
-          householdId: user.householdId,
           createdBy: user.uid,
-          updatedBy: user.uid
+          updatedBy: user.uid,
+          householdId: user.householdId ?? ''
         });
       }
 

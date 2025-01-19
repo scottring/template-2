@@ -132,25 +132,25 @@ const useTaskStore = create<TaskStore>((set, get) => ({
       // Get the task to check if it's linked to a goal
       const task = get().tasks.find(t => t.id === taskId);
       
-      // If task is linked to a goal, update the goal's success criteria
+      // If task is linked to a goal, update the goal's steps
       if (task?.goalId && task?.criteriaId) {
         const goalStore = useGoalStore.getState();
         const goal = goalStore.goals.find((g: Goal) => g.id === task.goalId);
         
         if (goal) {
-          const updatedCriteria = goal.successCriteria?.map((c: Step) => {
-            if (c.id === task.criteriaId) {
+          const updatedSteps = goal.steps?.map((step: Step) => {
+            if (step.id === task.criteriaId) {
               return {
-                ...c,
-                tasks: (c.tasks || []).filter((t: { id: string }) => t.id !== taskId)
+                ...step,
+                tasks: (step.tasks || []).filter((t: { id: string }) => t.id !== taskId)
               };
             }
-            return c;
+            return step;
           });
 
           await goalStore.updateGoal(goal.id, {
             ...goal,
-            successCriteria: updatedCriteria
+            steps: updatedSteps
           });
         }
       }

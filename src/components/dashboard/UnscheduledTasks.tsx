@@ -37,10 +37,10 @@ const item = {
   show: { opacity: 1, y: 0 }
 };
 
-interface CriteriaWithGoal {
+interface StepWithGoal {
   goalId: string;
   goalName: string;
-  criteria: any;
+  step: any;
   areaId: string;
   areaName: string;
 }
@@ -51,52 +51,52 @@ export function UnscheduledTasks() {
   const { goals, loading: goalsLoading } = useGoalStore();
   const { items: itineraryItems, addItem } = useItineraryStore();
   const { areas } = useAreaStore();
-  const [unscheduledCriteria, setUnscheduledCriteria] = useState<CriteriaWithGoal[]>([]);
-  const [selectedCriteria, setSelectedCriteria] = useState<CriteriaWithGoal | null>(null);
+  const [unscheduledSteps, setUnscheduledSteps] = useState<StepWithGoal[]>([]);
+  const [selectedStep, setSelectedStep] = useState<StepWithGoal | null>(null);
   const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
   const [selectedArea, setSelectedArea] = useState<string>('all');
   const [selectedTimeScale, setSelectedTimeScale] = useState<TimeScale | 'all'>('all');
 
-  // Get all unscheduled criteria
+  // Get all unscheduled steps
   useEffect(() => {
     if (!goals || !itineraryItems || !areas) return;
 
-    // Find all tracked criteria that aren't scheduled
-    const scheduledCriteriaIds = new Set(itineraryItems.map(item => item.criteriaId).filter(Boolean));
+    // Find all tracked steps that aren't scheduled
+    const scheduledStepIds = new Set(itineraryItems.map(item => item.stepId).filter(Boolean));
     
     const unscheduled = goals.flatMap(goal => {
       const area = areas.find(a => a.id === goal.areaId);
-      return (goal.successCriteria || [])
-        .filter(criteria => 
-          criteria.isTracked && 
-          !scheduledCriteriaIds.has(criteria.id)
+      return (goal.steps || [])
+        .filter(step => 
+          step.isTracked && 
+          !scheduledStepIds.has(step.id)
         )
-        .map(criteria => ({
+        .map(step => ({
           goalId: goal.id,
           goalName: goal.name,
-          criteria,
+          step,
           areaId: goal.areaId,
           areaName: area?.name || 'Uncategorized'
         }));
     });
 
-    setUnscheduledCriteria(unscheduled);
+    setUnscheduledSteps(unscheduled);
   }, [goals, itineraryItems, areas]);
 
-  // Filter criteria based on selected area and time scale
-  const filteredCriteria = useMemo(() => {
-    return unscheduledCriteria.filter(item => {
+  // Filter steps based on selected area and time scale
+  const filteredSteps = useMemo(() => {
+    return unscheduledSteps.filter(item => {
       const areaMatch = selectedArea === 'all' || item.areaId === selectedArea;
-      const timeScaleMatch = selectedTimeScale === 'all' || item.criteria.timescale === selectedTimeScale;
+      const timeScaleMatch = selectedTimeScale === 'all' || item.step.timescale === selectedTimeScale;
       return areaMatch && timeScaleMatch;
     });
-  }, [unscheduledCriteria, selectedArea, selectedTimeScale]);
+  }, [unscheduledSteps, selectedArea, selectedTimeScale]);
 
-  // Group criteria by area
-  const groupedCriteria = useMemo(() => {
-    const groups = new Map<string, CriteriaWithGoal[]>();
+  // Group steps by area
+  const groupedSteps = useMemo(() => {
+    const groups = new Map<string, StepWithGoal[]>();
     
-    filteredCriteria.forEach(item => {
+    filteredSteps.forEach(item => {
       if (!groups.has(item.areaId)) {
         groups.set(item.areaId, []);
       }
@@ -108,10 +108,10 @@ export function UnscheduledTasks() {
       areaName: items[0].areaName,
       items
     }));
-  }, [filteredCriteria]);
+  }, [filteredSteps]);
 
   const handleSchedule = (config: any) => {
-    if (!selectedCriteria || !user) return;
+    if (!selectedStep || !user) return;
 
     // Create schedule object without undefined values
     const schedule: any = {
@@ -127,22 +127,22 @@ export function UnscheduledTasks() {
 
     addItem({
       type: 'task',
-      referenceId: selectedCriteria.goalId,
-      criteriaId: selectedCriteria.criteria.id,
+      referenceId: selectedStep.goalId,
+      stepId: selectedStep.step.id,
       schedule,
       status: 'pending',
-      notes: selectedCriteria.criteria.text,
+      notes: selectedStep.step.text,
       createdBy: user.uid,
       updatedBy: user.uid,
       householdId: user.householdId ?? ''
     });
 
     setScheduleDialogOpen(false);
-    setSelectedCriteria(null);
+    setSelectedStep(null);
   };
 
-  const hasMore = unscheduledCriteria.length > 5;
-  const displayedCriteria = unscheduledCriteria.slice(0, 5);
+  const hasMore = unscheduledSteps.length > 5;
+  const displayedSteps = unscheduledSteps.slice(0, 5);
 
   return (
     <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
@@ -205,7 +205,7 @@ export function UnscheduledTasks() {
           </Select>
         </motion.div>
 
-        {groupedCriteria.length === 0 ? (
+        {groupedSteps.length === 0 ? (
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -221,13 +221,13 @@ export function UnscheduledTasks() {
             initial="hidden"
             animate="show"
           >
-            {groupedCriteria.map(({ areaId, areaName, items }) => (
+            {groupedSteps.map(({ areaId, areaName, items }) => (
               <motion.div key={areaId} variants={item}>
                 <h3 className="font-medium text-sm text-primary/70 mb-3">{areaName}</h3>
                 <div className="space-y-2">
-                  {items.map(({ goalId, goalName, criteria }) => (
+                  {items.map(({ goalId, goalName, step }) => (
                     <motion.div 
-                      key={criteria.id}
+                      key={step.id}
                       variants={item}
                       className={cn(
                         "group relative flex items-center justify-between p-3 rounded-lg transition-all duration-300",
@@ -239,7 +239,7 @@ export function UnscheduledTasks() {
                       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg" />
                       <div className="space-y-1 relative">
                         <p className="font-medium group-hover:text-primary transition-colors">
-                          {criteria.text}
+                          {step.text}
                         </p>
                         <Link 
                           href={`/goals/${goalId}`}
@@ -247,23 +247,22 @@ export function UnscheduledTasks() {
                         >
                           {goalName}
                         </Link>
-                        {criteria.frequency && criteria.timescale && (
+                        {step.frequency && step.timescale && (
                           <p className="text-xs text-muted-foreground">
-                            Target: {criteria.frequency} times per {criteria.timescale}
+                            {step.frequency} times {step.timescale}
                           </p>
                         )}
                       </div>
                       <Button
+                        variant="ghost"
                         size="sm"
-                        variant="outline"
+                        className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() => {
-                          setSelectedCriteria({ goalId, goalName, criteria, areaId, areaName });
+                          setSelectedStep({ goalId, goalName, step, areaId, areaName });
                           setScheduleDialogOpen(true);
                         }}
-                        className="shrink-0 gap-2 border-primary/20 hover:border-primary hover:bg-primary/10 hover:text-primary transition-all relative"
                       >
                         <CalendarIcon className="h-4 w-4" />
-                        Schedule
                       </Button>
                     </motion.div>
                   ))}
@@ -274,18 +273,12 @@ export function UnscheduledTasks() {
         )}
       </CardContent>
 
-      {selectedCriteria && (
-        <ScheduleDialog
-          open={scheduleDialogOpen}
-          onClose={() => {
-            setScheduleDialogOpen(false);
-            setSelectedCriteria(null);
-          }}
-          onSchedule={handleSchedule}
-          itemName={selectedCriteria.criteria.text}
-          targetDate={goals.find(g => g.id === selectedCriteria.goalId)?.targetDate}
-        />
-      )}
+      <ScheduleDialog
+        open={scheduleDialogOpen}
+        onClose={() => setScheduleDialogOpen(false)}
+        onSchedule={handleSchedule}
+        itemName={selectedStep?.step.text || ''}
+      />
     </Card>
   );
 }

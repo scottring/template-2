@@ -4,6 +4,7 @@ import { Fragment, useState } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import { X as XMarkIcon } from 'lucide-react';
 import { useProjectStore } from '@/lib/stores/useProjectStore';
+import { useUserStore } from '@/lib/stores/useUserStore';
 
 interface CreateProjectDialogProps {
   goalId: string;
@@ -13,6 +14,7 @@ interface CreateProjectDialogProps {
 
 export function CreateProjectDialog({ goalId, open, onClose }: CreateProjectDialogProps) {
   const addProject = useProjectStore((state) => state.addProject);
+  const currentUserProfile = useUserStore((state) => state.currentUserProfile);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -26,24 +28,27 @@ export function CreateProjectDialog({ goalId, open, onClose }: CreateProjectDial
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
+    if (!currentUserProfile) return;
 
     try {
-      await addProject(formData);
+      await addProject({
+        ...formData,
+        householdId: currentUserProfile.familyId ?? '',
+        createdBy: currentUserProfile.id,
+        updatedBy: currentUserProfile.id
+      });
       onClose();
       setFormData({
         name: '',
         description: '',
-        goalId: goalId,
+        goalId: '',
         startDate: new Date(),
         endDate: new Date(),
         progress: 0,
-        assignedTo: [],
+        assignedTo: []
       });
     } catch (error) {
       console.error('Error creating project:', error);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 

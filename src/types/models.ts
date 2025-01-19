@@ -31,6 +31,7 @@ export interface HouseholdMember {
   photoURL?: string;
   preferences: MemberPreferences;
   joinedAt: Date;
+  defaultAssignments: string[];
 }
 
 export interface InviteCode {
@@ -138,7 +139,7 @@ export interface Note {
 export interface ItineraryItem extends BaseItem {
   type: 'task' | 'habit' | 'event' | 'tangible';
   referenceId: string;
-  criteriaId?: string;
+  stepId?: string;
   schedule?: Schedule;
   status: 'pending' | 'completed' | 'cancelled' | 'ongoing';
   notes: string;
@@ -158,4 +159,107 @@ export interface Project extends BaseItem {
   endDate?: Date;
   assignedTo: string[];
   householdId: string;
+}
+
+export interface User extends BaseItem {
+  name: string;
+  email: string;
+  role: 'admin' | 'member';
+  photoURL?: string;
+  householdId?: string;
+}
+
+export interface Budget extends BaseItem {
+  householdId: string;
+  date: Date;
+  categories: {
+    [category: string]: {
+      planned: number;
+      actual: number;
+    };
+  };
+  totalPlanned: number;
+  totalActual: number;
+  notes: string;
+}
+
+export interface Transaction extends BaseItem {
+  householdId: string;
+  budgetId: string;
+  date: Date;
+  amount: number;
+  category: string;
+  description: string;
+  type: 'income' | 'expense';
+  paymentMethod: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  tags: string[];
+  notes: string;
+}
+
+export interface MealPlan extends BaseItem {
+  householdId: string;
+  startDate: Date;
+  endDate: Date;
+  meals: Meal[];
+  groceryList: GroceryItem[];
+  notes: string;
+}
+
+export interface Meal {
+  id: string;
+  name: string;
+  description: string;
+  type: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  date: Date;
+  servings: number;
+  ingredients: {
+    name: string;
+    amount: number;
+    unit: string;
+  }[];
+  instructions: string[];
+  prepTime: number;
+  cookTime: number;
+  assignedTo: string[];
+  notes: string;
+}
+
+export interface GroceryItem {
+  id: string;
+  name: string;
+  amount: number;
+  unit: string;
+  category: string;
+  purchased: boolean;
+  purchasedBy?: string;
+  purchasedAt?: Date;
+  notes: string;
+}
+
+export interface Resource {
+  id: string;
+  householdId: string;
+  name: string;
+  type: 'inventory' | 'currency' | 'energy' | 'other';
+  category: string;
+  value: number;
+  unit?: string;
+  threshold?: number;
+  description?: string;
+  tags?: string[];
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string;
+  updatedBy: string;
+  history: ResourceHistory[];
+}
+
+export interface ResourceHistory {
+  id: string;
+  previousValue: number;
+  newValue: number;
+  date: Date;
+  notes?: string;
+  updatedBy: string;
 }

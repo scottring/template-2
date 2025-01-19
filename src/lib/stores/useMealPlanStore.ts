@@ -378,15 +378,18 @@ export const useMealPlanStore = create<MealPlanStore>((set, get) => ({
     const end = dateEndOfWeek(now);
     
     return get().mealPlans.find(mp => {
-      const date = new Date(mp.date);
+      const date = new Date(mp.startDate);
       return date >= start && date <= end;
     });
   },
 
   getMealPlanByDate: (date) => {
+    const start = dateStartOfWeek(date);
+    const end = dateEndOfWeek(date);
+    
     return get().mealPlans.find(mp => {
-      const mpDate = new Date(mp.date);
-      return mpDate.toDateString() === date.toDateString();
+      const planDate = new Date(mp.startDate);
+      return planDate >= start && planDate <= end;
     });
   },
 

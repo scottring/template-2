@@ -5,6 +5,7 @@ import { Dialog, Transition } from '@headlessui/react';
 import { useUserStore } from '@/lib/stores/useUserStore';
 import { FormError } from '@/components/error/FormError';
 import { X, Share2, Check } from 'lucide-react';
+import Image from 'next/image';
 
 interface ShareDialogProps {
   open: boolean;
@@ -114,10 +115,12 @@ export function ShareDialog({ open, onClose, itemType, itemId, itemName }: Share
                       >
                         <div className="flex items-center min-w-0 gap-x-4">
                           {member.photoURL ? (
-                            <img
+                            <Image
                               src={member.photoURL}
                               alt={member.displayName}
-                              className="h-10 w-10 flex-none rounded-full bg-gray-50"
+                              width={40}
+                              height={40}
+                              className="flex-none rounded-full bg-gray-50"
                             />
                           ) : (
                             <div className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-gray-100">

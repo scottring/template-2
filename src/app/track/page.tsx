@@ -91,7 +91,7 @@ export default function TrackPage() {
         <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
           <CardHeader className="border-b border-primary/5 bg-gradient-to-r from-primary/5 to-accent/5">
             <CardTitle className="text-lg font-semibold bg-gradient-to-r from-primary to-accent-foreground bg-clip-text text-transparent">
-              Today's Schedule
+              Today&apos;s Schedule
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
@@ -137,7 +137,7 @@ export default function TrackPage() {
                           <div className="space-y-1">
                             <div className="flex items-center space-x-2">
                               <span className="text-sm font-medium text-muted-foreground/80 group-hover:text-muted-foreground transition-colors">
-                                {goal?.name}
+                                {goal?.name.replace(/'/g, "&apos;")}
                               </span>
                             </div>
                             {item.notes && (
@@ -148,7 +148,7 @@ export default function TrackPage() {
                             
                             {item.schedule?.repeat && (
                               <div className="flex items-center space-x-2 text-sm text-muted-foreground/70 group-hover:text-muted-foreground/90 transition-colors">
-                                <span>Every {item.schedule.repeat}</span>
+                                <span>Every {item.schedule.repeat.replace(/'/g, "&apos;")}</span>
                                 {streak > 0 && (
                                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary-foreground">
                                     🔥 {streak} day streak
@@ -206,7 +206,7 @@ export default function TrackPage() {
         <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
           <CardHeader className="border-b border-primary/5 bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5">
             <CardTitle className="text-lg font-semibold bg-gradient-to-r from-primary via-accent-foreground to-primary bg-clip-text text-transparent">
-              This Week's Schedule
+              This Week&apos;s Schedule
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
@@ -216,4 +216,4 @@ export default function TrackPage() {
       </div>
     </div>
   );
-} 
+}

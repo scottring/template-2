@@ -48,7 +48,7 @@ export default function TasksPage() {
 
       <TaskDialog
         open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
         task={selectedTask}
       />
     </div>

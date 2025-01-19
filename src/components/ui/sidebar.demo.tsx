@@ -9,7 +9,6 @@ export function SidebarDemo() {
         <SidebarBody>
           <div className="space-y-4">
             <SidebarLink
-              href="/"
               link={{
                 label: "Home",
                 href: "/",
@@ -17,7 +16,6 @@ export function SidebarDemo() {
               }}
             />
             <SidebarLink
-              href="/team"
               link={{
                 label: "Team",
                 href: "/team",
@@ -25,7 +23,6 @@ export function SidebarDemo() {
               }}
             />
             <SidebarLink
-              href="/settings"
               link={{
                 label: "Settings",
                 href: "/settings",

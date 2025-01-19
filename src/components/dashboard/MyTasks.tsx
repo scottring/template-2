@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
+import useTaskStore from '@/lib/stores/useTaskStore';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { Task } from '@/types/models';
 import { format } from 'date-fns';
@@ -17,11 +17,11 @@ export function MyTasks({ onTaskClick }: MyTasksProps) {
   const { user } = useAuth();
 
   const myTasks = useMemo(() => {
-    if (!user) return [];
     return tasks
-      .filter(task => 
-        task.status === 'pending' && 
-        task.assignedTo.includes(user.uid)
+      .filter(
+        (task) =>
+          task.status !== 'completed' &&
+          task.assignedTo.includes(user?.uid || '')
       )
       .sort((a, b) => {
         if (!a.dueDate) return 1;
@@ -29,7 +29,7 @@ export function MyTasks({ onTaskClick }: MyTasksProps) {
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
       })
       .slice(0, 5);
-  }, [tasks, user?.uid]);
+  }, [tasks, user]);
 
   const handleComplete = async (e: React.MouseEvent, taskId: string) => {
     e.stopPropagation();

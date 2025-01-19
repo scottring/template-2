@@ -142,17 +142,19 @@ const usePlanningStore = create<PlanningStore>((set, get) => ({
     const progress = get().criteriaProgress.get(criteriaId);
 
     if (progress) {
-      const updatedProgress: CriteriaProgress = {
-        ...progress,
+      const updatedProgress = {
         actualCount: status === 'completed' ? progress.actualCount + 1 : progress.actualCount,
         status: status === 'ongoing' ? 'ongoing' : progress.status,
-        instances: [...progress.instances, instance]
+        'instances': [...progress.instances, instance]
       };
 
       await updateDoc(progressRef, updatedProgress);
       
       set(state => ({
-        criteriaProgress: new Map(state.criteriaProgress).set(criteriaId, updatedProgress)
+        criteriaProgress: new Map(state.criteriaProgress).set(criteriaId, {
+          ...progress,
+          ...updatedProgress
+        })
       }));
     }
   },

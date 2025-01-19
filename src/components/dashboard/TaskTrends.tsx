@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
+import useTaskStore from '@/lib/stores/useTaskStore';
 import { Task } from '@/types/models';
 import { format, startOfWeek, eachDayOfInterval, subWeeks } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, TooltipProps } from 'recharts';
