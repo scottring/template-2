@@ -25,7 +25,10 @@ interface Step {
   text: string;
   stepType: 'Habit' | 'Tangible';
   frequency?: number;
+  frequencyType?: 'week' | 'month' | 'quarter' | 'year';
   targetDate?: Date;
+  notes?: string;
+  tasks: { text: string; isCompleted: boolean }[];
 }
 
 interface GoalData {
@@ -51,7 +54,8 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
   });
   const [currentStep, setCurrentStep] = useState<Step>({
     text: '',
-    stepType: 'Tangible'
+    stepType: 'Tangible',
+    tasks: []
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -101,7 +105,8 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
     
     setCurrentStep({
       text: '',
-      stepType: 'Tangible'
+      stepType: 'Tangible',
+      tasks: []
     });
     setError(null);
   };
@@ -136,6 +141,14 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
       x: direction < 0 ? 1000 : -1000,
       opacity: 0
     })
+  };
+
+  const setStepType = (value: 'Habit' | 'Tangible') => {
+    setCurrentStep(prev => ({ 
+      ...prev, 
+      stepType: value,
+      tasks: prev.tasks || [] // Ensure tasks is always initialized
+    }));
   };
 
   return (
@@ -310,9 +323,11 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                             <p className="text-sm text-muted-foreground">
                               {step.stepType}
                               {step.stepType === 'Habit' && step.frequency && 
-                                ` - ${step.frequency}x per week`}
+                                ` - ${step.frequency}x per ${step.frequencyType || 'week'}`}
                               {step.stepType === 'Tangible' && step.targetDate && 
                                 ` - Due ${format(step.targetDate, 'PP')}`}
+                              {data.targetDate && 
+                                ` - Target completion: ${format(data.targetDate, 'PP')}`}
                             </p>
                           </div>
                           <Button
@@ -337,9 +352,7 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                       />
                       <Select
                         value={currentStep.stepType}
-                        onValueChange={(value: 'Habit' | 'Tangible') => 
-                          setCurrentStep(prev => ({ ...prev, stepType: value }))
-                        }
+                        onValueChange={setStepType}
                       >
                         <SelectTrigger className="w-[180px]">
                           <SelectValue placeholder="Step type" />
@@ -362,18 +375,44 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                     </div>
 
                     {currentStep.stepType === 'Habit' && (
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          placeholder="Times per week"
-                          value={currentStep.frequency || ''}
-                          onChange={(e) => setCurrentStep(prev => ({ 
-                            ...prev, 
-                            frequency: parseInt(e.target.value) || undefined 
-                          }))}
-                          className="w-[150px]"
-                        />
-                        <span className="text-muted-foreground">times per week</span>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            placeholder="Frequency"
+                            value={currentStep.frequency || ''}
+                            onChange={(e) => setCurrentStep(prev => ({ 
+                              ...prev, 
+                              frequency: parseInt(e.target.value) || undefined 
+                            }))}
+                            className="w-[150px]"
+                          />
+                          <span className="text-muted-foreground">times per</span>
+                          <Select
+                            value={currentStep.frequencyType || 'week'}
+                            onValueChange={(value: 'week' | 'month' | 'quarter' | 'year') => 
+                              setCurrentStep(prev => ({ ...prev, frequencyType: value }))
+                            }
+                          >
+                            <SelectTrigger className="w-[120px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="week">Week</SelectItem>
+                              <SelectItem value="month">Month</SelectItem>
+                              <SelectItem value="quarter">Quarter</SelectItem>
+                              <SelectItem value="year">Year</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {currentStep.frequency && currentStep.frequencyType && `That's about ${
+                            currentStep.frequencyType === 'week' ? currentStep.frequency :
+                            currentStep.frequencyType === 'month' ? Math.round(currentStep.frequency / 4.33) :
+                            currentStep.frequencyType === 'quarter' ? Math.round(currentStep.frequency / 13) :
+                            Math.round(currentStep.frequency / 52)
+                          } times per week`}
+                        </p>
                       </div>
                     )}
 
@@ -404,8 +443,65 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                       </Popover>
                     )}
 
+                    {/* Add notes and tasks */}
+                    <div className="space-y-4">
+                      <Textarea
+                        placeholder="Add notes about this step (optional)..."
+                        value={currentStep.notes || ''}
+                        onChange={(e) => setCurrentStep(prev => ({ 
+                          ...prev, 
+                          notes: e.target.value 
+                        }))}
+                        className="h-20"
+                      />
+                      
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Tasks</p>
+                        {(currentStep.tasks || []).map((task, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <Input
+                              value={task.text}
+                              onChange={(e) => {
+                                const newTasks = [...(currentStep.tasks || [])];
+                                newTasks[index] = { ...task, text: e.target.value };
+                                setCurrentStep(prev => ({ ...prev, tasks: newTasks }));
+                              }}
+                              className="flex-1"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const newTasks = [...(currentStep.tasks || [])];
+                                newTasks.splice(index, 1);
+                                setCurrentStep(prev => ({ ...prev, tasks: newTasks }));
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newTasks = [...(currentStep.tasks || []), { text: '', isCompleted: false }];
+                            setCurrentStep(prev => ({ ...prev, tasks: newTasks }));
+                          }}
+                          className="w-full"
+                        >
+                          Add Task
+                        </Button>
+                      </div>
+                    </div>
+
                     <Button 
-                      onClick={addStep}
+                      onClick={() => {
+                        if (!currentStep.tasks) {
+                          currentStep.tasks = [];
+                        }
+                        addStep();
+                      }}
                       className="w-full"
                     >
                       Add Step
@@ -445,16 +541,33 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                   {data.steps.map((step, index) => (
                     <div 
                       key={index}
-                      className="p-4 rounded-lg border"
+                      className="p-4 rounded-lg border space-y-2"
                     >
                       <p className="font-medium">{step.text}</p>
                       <p className="text-sm text-muted-foreground">
                         {step.stepType}
                         {step.stepType === 'Habit' && step.frequency && 
-                          ` - ${step.frequency}x per week`}
+                          ` - ${step.frequency}x per ${step.frequencyType || 'week'}`}
                         {step.stepType === 'Tangible' && step.targetDate && 
                           ` - Due ${format(step.targetDate, 'PP')}`}
+                        {data.targetDate && 
+                          ` - Target completion: ${format(data.targetDate, 'PP')}`}
                       </p>
+                      {step.notes && (
+                        <p className="text-sm italic text-muted-foreground">
+                          {step.notes}
+                        </p>
+                      )}
+                      {step.tasks && step.tasks.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">Tasks:</p>
+                          <ul className="text-sm list-disc list-inside">
+                            {step.tasks.map((task, taskIndex) => (
+                              <li key={taskIndex}>{task.text}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
