@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from '@/components/ui/calendar';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 import { format, addMonths } from 'date-fns';
 import { ArrowRight, ArrowLeft, CalendarIcon, Target, ListTodo, Repeat, Sparkles, Loader2, FolderIcon } from 'lucide-react';
 import {
@@ -14,11 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { cn } from '@/lib/utils';
 import { GoalType, Area } from '@/types/models';
 import useAreaStore from '@/lib/stores/useAreaStore';
@@ -46,6 +42,22 @@ interface FlowCreatorProps {
   onComplete: (data: GoalData) => void;
   onCancel: () => void;
 }
+
+// Custom input component for the date picker
+const CustomDatePickerInput = React.forwardRef<HTMLButtonElement, { value?: string; onClick?: () => void }>(
+  ({ value, onClick }, ref) => (
+    <Button
+      variant="outline"
+      className="w-full justify-start text-left font-normal"
+      onClick={onClick}
+      ref={ref}
+    >
+      <CalendarIcon className="mr-2 h-4 w-4" />
+      {value}
+    </Button>
+  )
+);
+CustomDatePickerInput.displayName = 'CustomDatePickerInput';
 
 export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
   const areas = useAreaStore(state => state.areas);
@@ -403,25 +415,16 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
 
               <Card className="p-6">
                 <div className="flex justify-center">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-[280px] justify-start text-left font-normal"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {format(data.targetDate, 'PPP')}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={data.targetDate}
-                        onSelect={(date) => date && setData(prev => ({ ...prev, targetDate: date }))}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <DatePicker
+                    selected={data.targetDate}
+                    onChange={(date) => date && setData(prev => ({ ...prev, targetDate: date }))}
+                    customInput={<CustomDatePickerInput />}
+                    dateFormat="PPP"
+                    minDate={new Date()}
+                    showMonthDropdown
+                    showYearDropdown
+                    dropdownMode="select"
+                  />
                 </div>
               </Card>
             </div>
@@ -486,26 +489,16 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                   <div>
                     <label className="text-sm font-medium">Target Date</label>
                     <div className="mt-1">
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start text-left font-normal"
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {format(data.targetDate, 'PPP')}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={data.targetDate}
-                            onSelect={(date) => date && setData(prev => ({ ...prev, targetDate: date }))}
-                            initialFocus
-                            fromDate={new Date()} // Only allow dates from today onwards
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <DatePicker
+                        selected={data.targetDate}
+                        onChange={(date) => date && setData(prev => ({ ...prev, targetDate: date }))}
+                        customInput={<CustomDatePickerInput />}
+                        dateFormat="PPP"
+                        minDate={new Date()}
+                        showMonthDropdown
+                        showYearDropdown
+                        dropdownMode="select"
+                      />
                     </div>
                   </div>
                 </div>
@@ -604,8 +597,16 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                             )}
 
                             {step.stepType === 'Tangible' && (
-                              <Popover>
-                                <PopoverTrigger asChild>
+                              <DatePicker
+                                selected={step.targetDate}
+                                onChange={(date) => {
+                                  if (date) {
+                                    const newSteps = [...data.steps];
+                                    newSteps[index] = { ...step, targetDate: date };
+                                    setData(prev => ({ ...prev, steps: newSteps }));
+                                  }
+                                }}
+                                customInput={
                                   <Button
                                     variant="outline"
                                     className="w-[180px] justify-start text-left font-normal"
@@ -613,23 +614,13 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                                     <CalendarIcon className="mr-2 h-4 w-4" />
                                     {step.targetDate ? format(step.targetDate, 'PP') : 'Select date'}
                                   </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                  <Calendar
-                                    mode="single"
-                                    selected={step.targetDate}
-                                    onSelect={(date) => {
-                                      if (date) {
-                                        const newSteps = [...data.steps];
-                                        newSteps[index] = { ...step, targetDate: date };
-                                        setData(prev => ({ ...prev, steps: newSteps }));
-                                      }
-                                    }}
-                                    initialFocus
-                                    fromDate={new Date()} // Only allow dates from today onwards
-                                  />
-                                </PopoverContent>
-                              </Popover>
+                                }
+                                dateFormat="PP"
+                                minDate={new Date()}
+                                showMonthDropdown
+                                showYearDropdown
+                                dropdownMode="select"
+                              />
                             )}
                           </div>
 
