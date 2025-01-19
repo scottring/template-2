@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Menu, Transition } from "@headlessui/react";
 import { Fragment } from "react";
 import {
@@ -14,10 +14,13 @@ import {
   Trash2,
   Pencil,
   ArrowUpRight,
+  Plus,
+  Check,
+  X,
 } from "lucide-react";
 import useGoalStore from "@/lib/stores/useGoalStore";
 import { useProjectStore } from "@/lib/stores/useProjectStore";
-import { Goal, Project, Step } from "@/types/models";
+import { Goal, Project, Step, GoalType } from "@/types/models";
 import { CreateProjectDialog } from "@/components/projects/CreateProjectDialog";
 import { ShareDialog } from "@/components/shared/ShareDialog";
 import { SharedIndicator } from "@/components/shared/SharedIndicator";
@@ -29,307 +32,384 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { DatePicker } from '../../../components/ui/date-picker';
 
-export default function GoalDetailPage({ params }: { params: { id: string } }) {
-  const [isCreateProjectDialogOpen, setIsCreateProjectDialogOpen] = useState(false);
-  const [isEditGoalDialogOpen, setIsEditGoalDialogOpen] = useState(false);
-  const [sharingGoal, setSharingGoal] = useState<Goal | null>(null);
+type EditableGoal = {
+  id: string;
+  name: string;
+  description: string;
+  areaId: string;
+  startDate: Date;
+  targetDate?: Date;
+  progress: number;
+  goalType: GoalType;
+  status: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
+  steps: Step[];
+  assignedTo: string[];
+  householdId: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+  createdBy?: string;
+  updatedBy?: string;
+};
+
+export default function GoalPage() {
+  const params = useParams();
   const router = useRouter();
-  
-  const { goals, loading, error } = useGoalStore();
+  const { goals, updateGoal } = useGoalStore();
   const { projects, setProjects } = useProjectStore();
-  const goal = goals.find((g: Goal) => g.id === params.id);
+  const goal = goals.find(g => g.id === params.id);
   const goalProjects = projects.filter((project: Project) => project.goalId === params.id);
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedGoal, setEditedGoal] = useState<EditableGoal | undefined>(goal ? {
+    id: goal.id,
+    name: goal.name,
+    description: goal.description,
+    areaId: goal.areaId,
+    startDate: goal.startDate,
+    targetDate: goal.targetDate,
+    progress: goal.progress,
+    goalType: goal.goalType,
+    status: goal.status,
+    steps: goal.steps,
+    assignedTo: goal.assignedTo,
+    householdId: goal.householdId
+  } : undefined);
+  const [newStep, setNewStep] = useState<Partial<Step>>({
+    id: '',
+    text: '',
+    stepType: 'Tangible',
+    isTracked: true,
+    tasks: []
+  });
 
-  // If we're not loading and there's no goal, redirect
-  useEffect(() => {
-    if (!loading && !goal) {
-      router.push('/goals');
-    }
-  }, [goal, loading, router]);
+  if (!goal || !editedGoal) return null;
 
-  const handleDeleteGoal = async () => {
-    if (!goal) return;
-    
-    if (window.confirm('Are you sure you want to delete this goal? This action cannot be undone.')) {
-      try {
-        await useGoalStore.getState().deleteGoal(goal.id);
-        router.push('/goals');
-      } catch (error) {
-        console.error('Error deleting goal:', error);
-      }
+  const handleSave = () => {
+    if (editedGoal) {
+      const updatedGoal: Goal = {
+        ...editedGoal,
+        createdAt: goal.createdAt,
+        updatedAt: new Date(),
+        createdBy: goal.createdBy,
+        updatedBy: goal.updatedBy
+      };
+      updateGoal(goal.id, updatedGoal);
+      setIsEditing(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-32 w-32 animate-spin rounded-full border-b-2 border-t-2 border-blue-500" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="text-red-500">Error loading goal: {error}</div>
-      </div>
-    );
-  }
-
-  if (!goal) {
-    return null;
-  }
-
-  const container = {
-    hidden: { opacity: 0, height: 0 },
-    show: {
-      opacity: 1,
-      height: 'auto',
-      transition: {
-        when: "beforeChildren",
-        staggerChildren: 0.1,
-      },
-    },
+  const handleUpdateEditedGoal = (updates: Partial<EditableGoal>) => {
+    if (editedGoal) {
+      setEditedGoal({ ...editedGoal, ...updates });
+    }
   };
 
-  const item = {
-    hidden: { opacity: 0, y: 20 },
-    show: { opacity: 1, y: 0 },
+  const handleAddStep = () => {
+    if (newStep.text && editedGoal) {
+      const step: Step = {
+        ...newStep as Step,
+        id: Math.random().toString(36).substr(2, 9),
+        tasks: [],
+        notes: []
+      };
+      handleUpdateEditedGoal({
+        steps: [...editedGoal.steps, step]
+      });
+      setNewStep({
+        id: '',
+        text: '',
+        stepType: 'Tangible',
+        isTracked: true,
+        tasks: []
+      });
+    }
+  };
+
+  const handleUpdateStep = (stepId: string, updates: Partial<Step>) => {
+    if (editedGoal) {
+      handleUpdateEditedGoal({
+        steps: editedGoal.steps.map(step => 
+          step.id === stepId ? { ...step, ...updates } : step
+        )
+      });
+    }
+  };
+
+  const handleDeleteStep = (stepId: string) => {
+    if (editedGoal) {
+      handleUpdateEditedGoal({
+        steps: editedGoal.steps.filter(step => step.id !== stepId)
+      });
+    }
+  };
+
+  const handleAddTask = (stepId: string, taskText: string) => {
+    if (editedGoal) {
+      handleUpdateEditedGoal({
+        steps: editedGoal.steps.map(step => {
+          if (step.id === stepId) {
+            return {
+              ...step,
+              tasks: [...step.tasks, {
+                id: Math.random().toString(36).substr(2, 9),
+                text: taskText,
+                completed: false
+              }]
+            };
+          }
+          return step;
+        })
+      });
+    }
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 max-w-5xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-x-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.back()}
-            className="rounded-full hover:bg-accent/10 transition-colors"
-          >
-            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-x-3">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-primary via-accent-foreground to-primary bg-clip-text text-transparent">
-                {goal.name}
-              </h1>
-              <Badge 
-                variant="secondary"
-                className={cn(
-                  "bg-primary/10 text-primary hover:bg-primary/20",
-                  goal.goalType === 'Habit' && "bg-accent/10 text-accent-foreground hover:bg-accent/20"
-                )}
+        <button
+          onClick={() => router.back()}
+          className="flex items-center text-muted-foreground hover:text-primary transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back
+        </button>
+        <div className="flex items-center gap-2">
+          {isEditing ? (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditedGoal({
+                    id: goal.id,
+                    name: goal.name,
+                    description: goal.description,
+                    areaId: goal.areaId,
+                    startDate: goal.startDate,
+                    targetDate: goal.targetDate,
+                    progress: goal.progress,
+                    goalType: goal.goalType,
+                    status: goal.status,
+                    steps: goal.steps,
+                    assignedTo: goal.assignedTo,
+                    householdId: goal.householdId
+                  });
+                  setIsEditing(false);
+                }}
               >
-                {goal.goalType}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-x-2 text-sm text-muted-foreground mt-1">
-              <div className="flex items-center gap-x-1">
-                <Calendar className="h-4 w-4" />
-                <span>Due {goal.targetDate?.toLocaleDateString()}</span>
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button size="sm" onClick={handleSave}>
+                <Check className="h-4 w-4 mr-2" />
+                Save Changes
+              </Button>
+            </>
+          ) : (
+            <Button size="sm" onClick={() => setIsEditing(true)}>
+              Edit Goal
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1 flex-1">
+            {isEditing ? (
+              <Input
+                value={editedGoal.name}
+                onChange={(e) => handleUpdateEditedGoal({ name: e.target.value })}
+                className="text-2xl font-bold"
+              />
+            ) : (
+              <h1 className="text-2xl font-bold">{goal.name}</h1>
+            )}
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">{goal.goalType}</Badge>
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4 mr-1" />
+                {isEditing ? (
+                  <DatePicker
+                    date={editedGoal.targetDate}
+                    onChange={(date: Date | undefined) => handleUpdateEditedGoal({ targetDate: date })}
+                  />
+                ) : (
+                  <span>Due {new Date(goal.targetDate || Date.now()).toLocaleDateString()}</span>
+                )}
               </div>
-              <span className="text-muted-foreground/30">•</span>
-              <div className="flex items-center gap-x-1">
-                <Target className="h-4 w-4" />
-                <span>{goal.progress}% complete</span>
-              </div>
-              <span className="text-muted-foreground/30">•</span>
-              <SharedIndicator sharedWith={goal.assignedTo} />
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-x-2">
-          <Button
-            onClick={() => setIsCreateProjectDialogOpen(true)}
-            className="gap-2 bg-gradient-to-r from-primary to-accent-foreground hover:opacity-90 transition-opacity"
-          >
-            <PlusIcon className="h-5 w-5" />
-            New Project
-          </Button>
-
-          <Menu as="div" className="relative">
-            <Menu.Button className="rounded-full p-2 hover:bg-accent/10 transition-colors">
-              <MoreVertical className="h-5 w-5 text-muted-foreground" />
-            </Menu.Button>
-            <Transition
-              as={Fragment}
-              enter="transition ease-out duration-100"
-              enterFrom="transform opacity-0 scale-95"
-              enterTo="transform opacity-100 scale-100"
-              leave="transition ease-in duration-75"
-              leaveFrom="transform opacity-100 scale-100"
-              leaveTo="transform opacity-0 scale-95"
-            >
-              <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-lg bg-card border border-border shadow-lg focus:outline-none">
-                <div className="py-1">
-                  <Menu.Item>
-                    {({ active }) => (
-                      <button
-                        onClick={() => setIsEditGoalDialogOpen(true)}
-                        className={cn(
-                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
-                          active ? "bg-accent/5 text-accent-foreground" : "text-muted-foreground"
-                        )}
-                      >
-                        <Pencil className="mr-3 h-4 w-4" />
-                        Edit
-                      </button>
-                    )}
-                  </Menu.Item>
-                  <Menu.Item>
-                    {({ active }) => (
-                      <button
-                        onClick={() => setSharingGoal(goal)}
-                        className={cn(
-                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
-                          active ? "bg-accent/5 text-accent-foreground" : "text-muted-foreground"
-                        )}
-                      >
-                        <Share2 className="mr-3 h-4 w-4" />
-                        Share
-                      </button>
-                    )}
-                  </Menu.Item>
-                  <Menu.Item>
-                    {({ active }) => (
-                      <button
-                        onClick={handleDeleteGoal}
-                        className={cn(
-                          "flex w-full items-center px-4 py-2 text-sm transition-colors",
-                          active ? "bg-destructive/10 text-destructive" : "text-destructive/80"
-                        )}
-                      >
-                        <Trash2 className="mr-3 h-4 w-4" />
-                        Delete
-                      </button>
-                    )}
-                  </Menu.Item>
-                </div>
-              </Menu.Items>
-            </Transition>
-          </Menu>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
-            <CardContent className="p-6">
-              <h2 className="text-lg font-semibold bg-gradient-to-r from-primary to-accent-foreground bg-clip-text text-transparent mb-4">
-                Description
-              </h2>
+        <Card>
+          <CardContent className="p-6">
+            <h2 className="font-semibold mb-2">Description</h2>
+            {isEditing ? (
+              <Textarea
+                value={editedGoal.description}
+                onChange={(e) => handleUpdateEditedGoal({ description: e.target.value })}
+                className="min-h-[100px]"
+              />
+            ) : (
               <p className="text-muted-foreground">{goal.description}</p>
-            </CardContent>
-          </Card>
+            )}
+          </CardContent>
+        </Card>
 
-          <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
-            <CardContent className="p-6">
-              <h2 className="text-lg font-semibold bg-gradient-to-r from-primary to-accent-foreground bg-clip-text text-transparent mb-4">
-                Steps
-              </h2>
-              <motion.ul 
-                className="mt-2 space-y-3"
-                variants={container}
-                initial="hidden"
-                animate="show"
-              >
-                {goal.steps.map((step: Step, index: number) => (
-                  <motion.li 
-                    key={index} 
-                    variants={item}
-                    className="group flex items-start gap-x-3 text-sm"
-                  >
-                    <div className="relative mt-1 flex h-5 w-5 items-center justify-center">
-                      <div className="h-4 w-4 rounded-full border-2 border-primary/20 group-hover:border-primary/40 transition-colors" />
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">Steps</h2>
+            {isEditing && (
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Add a new step..."
+                  value={newStep.text}
+                  onChange={(e) => setNewStep({ ...newStep, text: e.target.value })}
+                  className="w-[300px]"
+                />
+                <DatePicker
+                  date={newStep.startDateTime}
+                  onChange={(date: Date | undefined) => setNewStep({ ...newStep, startDateTime: date })}
+                  placeholder="Start date"
+                />
+                <DatePicker
+                  date={newStep.endDateTime}
+                  onChange={(date: Date | undefined) => setNewStep({ ...newStep, endDateTime: date })}
+                  placeholder="End date"
+                />
+                <Button size="sm" onClick={handleAddStep}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Step
+                </Button>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            {editedGoal.steps.map((step) => (
+              <Card key={step.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 space-y-2">
+                      {isEditing ? (
+                        <>
+                          <Input
+                            value={step.text}
+                            onChange={(e) => handleUpdateStep(step.id, { text: e.target.value })}
+                          />
+                          <div className="flex items-center gap-2">
+                            <DatePicker
+                              date={step.startDateTime}
+                              onChange={(date: Date | undefined) => handleUpdateStep(step.id, { startDateTime: date })}
+                              placeholder="Start date"
+                            />
+                            <DatePicker
+                              date={step.endDateTime}
+                              onChange={(date: Date | undefined) => handleUpdateStep(step.id, { endDateTime: date })}
+                              placeholder="End date"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p>{step.text}</p>
+                          {(step.startDateTime || step.endDateTime) && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Calendar className="h-4 w-4" />
+                              {step.startDateTime && (
+                                <span>Starts: {new Date(step.startDateTime).toLocaleDateString()}</span>
+                              )}
+                              {step.endDateTime && (
+                                <span>Due: {new Date(step.endDateTime).toLocaleDateString()}</span>
+                              )}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
-                    <span className="text-muted-foreground group-hover:text-foreground transition-colors">
-                      {step.text}
-                    </span>
-                  </motion.li>
-                ))}
-              </motion.ul>
-            </CardContent>
-          </Card>
+                    {isEditing && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleDeleteStep(step.id)}>
+                            Delete Step
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
 
-          <Card className="overflow-hidden backdrop-blur-sm bg-background/60 border-primary/10">
-            <CardContent className="p-6">
-              <h2 className="text-lg font-semibold bg-gradient-to-r from-primary to-accent-foreground bg-clip-text text-transparent mb-4">
-                Projects
-              </h2>
-              <motion.div 
-                className="space-y-3"
-                variants={container}
-                initial="hidden"
-                animate="show"
-              >
-                {goalProjects.map((project) => (
-                  <motion.div
-                    key={project.id}
-                    variants={item}
-                    className="group flex items-center justify-between rounded-lg border border-transparent hover:border-accent/20 bg-accent/5 hover:bg-accent/10 p-4 transition-all duration-200"
-                  >
-                    <div>
-                      <h3 className="font-medium text-foreground/90 group-hover:text-foreground transition-colors">
-                        {project.name}
-                      </h3>
-                      <p className="text-sm text-muted-foreground group-hover:text-muted-foreground/80 transition-colors">
-                        {project.description}
-                      </p>
+                  <div className="mt-4">
+                    <h4 className="text-sm font-medium mb-2">Tasks</h4>
+                    <div className="space-y-2">
+                      {step.tasks.map((task) => (
+                        <div key={task.id} className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={task.completed}
+                            onChange={(e) => {
+                              handleUpdateStep(step.id, {
+                                tasks: step.tasks.map(t =>
+                                  t.id === task.id ? { ...t, completed: e.target.checked } : t
+                                )
+                              });
+                            }}
+                            className="rounded border-gray-300"
+                          />
+                          {isEditing ? (
+                            <Input
+                              value={task.text}
+                              onChange={(e) => {
+                                handleUpdateStep(step.id, {
+                                  tasks: step.tasks.map(t =>
+                                    t.id === task.id ? { ...t, text: e.target.value } : t
+                                  )
+                                });
+                              }}
+                            />
+                          ) : (
+                            <span className={task.completed ? 'line-through text-muted-foreground' : ''}>
+                              {task.text}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                      {isEditing && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <Input
+                            placeholder="Add a new task..."
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && e.currentTarget.value) {
+                                handleAddTask(step.id, e.currentTarget.value);
+                                e.currentTarget.value = '';
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => router.push(`/projects/${project.id}`)}
-                      className="text-muted-foreground/50 hover:text-primary transition-colors opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all duration-200"
-                    >
-                      <ArrowUpRight className="h-5 w-5" />
-                    </Button>
-                  </motion.div>
-                ))}
-                {goalProjects.length === 0 && (
-                  <motion.p 
-                    variants={item}
-                    className="text-muted-foreground text-center py-8"
-                  >
-                    No projects yet
-                  </motion.p>
-                )}
-              </motion.div>
-            </CardContent>
-          </Card>
-
-          <TasksSection goalId={goal.id} />
-        </div>
-
-        <div className="space-y-6">
-          <Notepad initialContent="" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       </div>
-
-      <EditGoalDialog
-        open={isEditGoalDialogOpen}
-        onClose={() => setIsEditGoalDialogOpen(false)}
-        goal={goal}
-      />
-
-      <CreateProjectDialog
-        goalId={goal.id}
-        open={isCreateProjectDialogOpen}
-        onClose={() => setIsCreateProjectDialogOpen(false)}
-      />
-
-      {sharingGoal && (
-        <ShareDialog
-          open={true}
-          onClose={() => setSharingGoal(null)}
-          itemType="goals"
-          itemId={sharingGoal.id}
-          itemName={sharingGoal.name}
-        />
-      )}
     </div>
   );
 }
