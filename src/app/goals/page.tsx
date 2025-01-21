@@ -143,7 +143,10 @@ export default function GoalsPage() {
               key={goal.id}
               variants={item}
               className="group relative"
-              onClick={() => router.push(`/goals/${goal.id}`)}
+              onClick={() => {
+                console.log('Navigating to goal:', goal.id);
+                router.push(`/goals/${goal.id}`);
+              }}
             >
               <Card className="cursor-pointer hover:shadow-md transition-shadow backdrop-blur-sm bg-background/95">
                 <CardContent className="p-6">

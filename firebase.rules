@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isHouseholdMember(householdId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.householdId == householdId;
+    }
+    
+    function isHouseholdOwner(householdId) {
+      return isHouseholdMember(householdId) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
+    }
+    
+    function hasAccess(resourceData) {
+      let isOwner = resourceData.ownerId == request.auth.uid;
+      let isSharedHousehold = resourceData.visibility == 'household' && 
+                             isHouseholdMember(resourceData.householdId);
+      return isOwner || isSharedHousehold;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        isHouseholdMember(resource.data.householdId)
+      );
+      allow write: if request.auth.uid == userId;
+    }
+
+    // Households
+    match /households/{householdId} {
+      allow read: if isHouseholdMember(householdId);
+      allow create: if isAuthenticated();
+      allow update, delete: if isHouseholdOwner(householdId);
+      
+      // Nested collections within households
+      match /members/{memberId} {
+        allow read: if isHouseholdMember(householdId);
+        allow write: if isHouseholdOwner(householdId);
+      }
+    }
+
+    // Goals
+    match /goals/{goalId} {
+      allow read: if isAuthenticated() && hasAccess(resource.data);
+      allow create: if isAuthenticated() && hasAccess(request.resource.data);
+      allow update, delete: if isAuthenticated() && hasAccess(resource.data);
+    }
+
+    // Tasks
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated() && hasAccess(resource.data);
+      allow create: if isAuthenticated() && hasAccess(request.resource.data);
+      allow update, delete: if isAuthenticated() && hasAccess(resource.data);
+    }
+
+    // Projects
+    match /projects/{projectId} {
+      allow read: if isAuthenticated() && hasAccess(resource.data);
+      allow create: if isAuthenticated() && hasAccess(request.resource.data);
+      allow update, delete: if isAuthenticated() && hasAccess(resource.data);
+    }
+
+    // Areas
+    match /areas/{areaId} {
+      allow read: if isAuthenticated() && hasAccess(resource.data);
+      allow create: if isAuthenticated() && hasAccess(request.resource.data);
+      allow update, delete: if isAuthenticated() && hasAccess(resource.data);
+    }
+  }
+}

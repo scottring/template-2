@@ -5,13 +5,10 @@ import { User as FirebaseUser, GoogleAuthProvider, signInWithPopup, signOut as f
 import { auth, db } from '@/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, collection, addDoc } from 'firebase/firestore';
-
-interface User extends FirebaseUser {
-  householdId?: string;
-}
+import { AuthUser, UserRoles } from '@/types/auth';
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
   error: string | null;
   signInWithGoogle: () => Promise<void>;
@@ -27,29 +24,35 @@ export const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const createAuthUser = (firebaseUser: FirebaseUser, roles: UserRoles): AuthUser => ({
+    uid: firebaseUser.uid,
+    email: firebaseUser.email || '',
+    displayName: firebaseUser.displayName || '',
+    roles,
+    householdId: roles.householdId // Mirror householdId at root level for backward compatibility
+  });
+
   useEffect(() => {
-    console.log('Setting up auth state listener');
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
-        console.log('Auth state changed:', firebaseUser?.uid);
         if (firebaseUser) {
-          // Fetch user's household ID from Firestore
+          // Fetch user's data from Firestore
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          const householdId = userDoc.data()?.householdId;
+          const userData = userDoc.data();
           
-          console.log('Fetched household ID:', householdId);
+          const householdId = userData?.householdId || null;
+          const roles: UserRoles = {
+            isHouseholdOwner: userData?.role === 'owner',
+            householdId: householdId,
+            householdRole: userData?.role || null
+          };
           
-          const userWithHousehold = {
-            ...firebaseUser,
-            householdId
-          } as User;
-          setUser(userWithHousehold);
+          setUser(createAuthUser(firebaseUser, roles));
         } else {
-          console.log('No user found');
           setUser(null);
         }
       } catch (error) {
@@ -69,30 +72,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(true);
       setError(null);
       
-      // Set persistence to LOCAL
       await setPersistence(auth, browserLocalPersistence);
       
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
-      
-      console.log('Signed in with Google:', result.user.uid);
       
       // Create or update user document in Firestore
       const userRef = doc(db, 'users', result.user.uid);
       const userDoc = await getDoc(userRef);
       
       if (!userDoc.exists()) {
-        console.log('Creating new user document');
         // Create a new household
         const householdRef = await addDoc(collection(db, 'households'), {
           name: `${result.user.displayName}'s Household`,
           createdAt: new Date(),
           updatedAt: new Date(),
-          createdBy: result.user.uid,
-          updatedBy: result.user.uid,
+          ownerId: result.user.uid,
           members: [{
             userId: result.user.uid,
-            role: 'admin',
+            role: 'owner',
             displayName: result.user.displayName || '',
             photoURL: result.user.photoURL || '',
             joinedAt: new Date()
@@ -106,26 +104,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           photoURL: result.user.photoURL,
           createdAt: new Date(),
           updatedAt: new Date(),
-          householdId: householdRef.id
+          householdId: householdRef.id,
+          role: 'owner'
         });
 
-        console.log('Created new household:', householdRef.id);
+        const roles: UserRoles = {
+          isHouseholdOwner: true,
+          householdId: householdRef.id,
+          householdRole: 'owner'
+        };
 
-        // Update user state with household ID
-        const userWithHousehold = {
-          ...result.user,
-          householdId: householdRef.id
-        } as User;
-        setUser(userWithHousehold);
+        setUser(createAuthUser(result.user, roles));
       } else {
-        console.log('User document exists');
-        // User exists, update the user state with existing household ID
         const userData = userDoc.data();
-        const userWithHousehold = {
-          ...result.user,
-          householdId: userData?.householdId
-        } as User;
-        setUser(userWithHousehold);
+        const householdId = userData?.householdId || null;
+        const roles: UserRoles = {
+          isHouseholdOwner: userData?.role === 'owner',
+          householdId: householdId,
+          householdRole: userData?.role || null
+        };
+
+        setUser(createAuthUser(result.user, roles));
       }
     } catch (error) {
       console.error('Error signing in:', error);

@@ -1,3 +1,5 @@
+import { Visibility } from './auth';
+
 export type TimeScale = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
 export interface Schedule {
@@ -16,9 +18,12 @@ export interface BaseItem {
   updatedAt: Date;
   createdBy: string;
   updatedBy: string;
+  ownerId: string; // Added for authorization
+  visibility: Visibility; // Added for authorization
+  householdId: string | null; // Made consistent across all models
 }
 
-export interface Household extends BaseItem {
+export interface Household extends Omit<BaseItem, 'visibility' | 'householdId' | 'ownerId'> {
   name: string;
   members: HouseholdMember[];
   inviteCodes: InviteCode[];
@@ -26,7 +31,7 @@ export interface Household extends BaseItem {
 
 export interface HouseholdMember {
   userId: string;
-  role: 'admin' | 'member';
+  role: 'owner' | 'member';
   displayName: string;
   photoURL?: string;
   preferences: MemberPreferences;
@@ -63,7 +68,6 @@ export interface Task extends BaseItem {
   priority: 'low' | 'medium' | 'high';
   category: TaskCategory;
   assignedTo: string[];
-  householdId: string;
   goalId?: string;
   criteriaId?: string;
   dueDate?: Date;
@@ -85,7 +89,6 @@ export interface Goal extends BaseItem {
   status: 'not_started' | 'in_progress' | 'completed' | 'cancelled';
   steps: Step[];
   assignedTo: string[];
-  householdId: string;
 }
 
 export interface Area extends BaseItem {
@@ -94,7 +97,6 @@ export interface Area extends BaseItem {
   color: string;
   icon: string;
   parentId?: string;
-  householdId: string;
   isFocus?: boolean;
   isActive?: boolean;
   assignedTo: string[];
@@ -143,7 +145,6 @@ export interface ItineraryItem extends BaseItem {
   schedule?: Schedule;
   status: 'pending' | 'completed' | 'cancelled' | 'ongoing';
   notes: string;
-  householdId: string;
   dueDate?: Date;
   targetDate?: Date;
 }
@@ -158,19 +159,17 @@ export interface Project extends BaseItem {
   startDate?: Date;
   endDate?: Date;
   assignedTo: string[];
-  householdId: string;
 }
 
-export interface User extends BaseItem {
+export interface User extends Omit<BaseItem, 'visibility' | 'householdId' | 'ownerId'> {
   name: string;
   email: string;
-  role: 'admin' | 'member';
+  role: 'owner' | 'member';
   photoURL?: string;
   householdId?: string;
 }
 
 export interface Budget extends BaseItem {
-  householdId: string;
   date: Date;
   categories: {
     [category: string]: {
@@ -184,7 +183,6 @@ export interface Budget extends BaseItem {
 }
 
 export interface Transaction extends BaseItem {
-  householdId: string;
   budgetId: string;
   date: Date;
   amount: number;
@@ -198,7 +196,6 @@ export interface Transaction extends BaseItem {
 }
 
 export interface MealPlan extends BaseItem {
-  householdId: string;
   startDate: Date;
   endDate: Date;
   meals: Meal[];
@@ -237,9 +234,7 @@ export interface GroceryItem {
   notes: string;
 }
 
-export interface Resource {
-  id: string;
-  householdId: string;
+export interface Resource extends BaseItem {
   name: string;
   type: 'inventory' | 'currency' | 'energy' | 'other';
   category: string;
@@ -248,10 +243,6 @@ export interface Resource {
   threshold?: number;
   description?: string;
   tags?: string[];
-  createdAt: Date;
-  updatedAt: Date;
-  createdBy: string;
-  updatedBy: string;
   history: ResourceHistory[];
 }
 

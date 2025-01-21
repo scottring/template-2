@@ -155,7 +155,7 @@ const useGoalStore = create<GoalStore>((set, get) => ({
         householdId: goal.householdId,
         name: goal.name || '',
         description: goal.description || '',
-        goalType: goal.goalType || 'Tangible',
+        goalType: goal.goalType || 'Project',
         areaId: goal.areaId || '',
         assignedTo: goal.assignedTo || [],
         status: goal.status || 'not_started',

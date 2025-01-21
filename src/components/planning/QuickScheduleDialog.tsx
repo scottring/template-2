@@ -26,7 +26,10 @@ import useAreaStore from '@/lib/stores/useAreaStore';
 import useGoalStore from '@/lib/stores/useGoalStore';
 import useItineraryStore from '@/lib/stores/useItineraryStore';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useAuthorization } from '@/lib/hooks/useAuthorization';
 import { StepScheduler } from '@/components/goals/StepScheduler';
+import { VisibilitySelector } from '@/components/shared/VisibilitySelector';
+import { Visibility } from '@/types/auth';
 
 const DAYS_OF_WEEK = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -100,7 +103,13 @@ const getDayName = (day: string): string => {
 
 export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps) {
   const { user } = useAuth();
+  const { getDefaultVisibility } = useAuthorization();
   const { areas, addArea } = useAreaStore();
+
+  // Add visibility state
+  const [visibility, setVisibility] = useState<Visibility>(() =>
+    getDefaultVisibility()
+  );
   const { addGoal } = useGoalStore();
   const { addItem } = useItineraryStore();
 
@@ -256,6 +265,8 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
           isActive: true,
           isFocus: false,
           assignedTo: [user.uid],
+          ownerId: user.uid,
+          visibility,
         });
       }
 
@@ -275,6 +286,8 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
         progress: 0,
         assignedTo: [user.uid],
         householdId: user.householdId,
+        ownerId: user.uid,
+        visibility,
       });
 
       // Create itinerary items for tracked criteria
@@ -290,7 +303,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
             startDate: criterion.startDateTime || new Date(startDate),
             endDate: criterion.repeatEndDate,
             repeat: criterion.timescale,
-            schedules: criterion.scheduledTimes ? 
+            schedules: criterion.scheduledTimes ?
               Object.entries(criterion.scheduledTimes).flatMap(([day, times]) =>
                 times.map(time => ({ day: parseInt(day), time }))
               ) : []
@@ -299,7 +312,9 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
           notes: criterion.text,
           createdBy: user.uid,
           updatedBy: user.uid,
-          householdId: user.householdId ?? ''
+          householdId: user.householdId ?? '',
+          ownerId: user.uid,
+          visibility
         });
       }
 
@@ -329,13 +344,28 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-4xl max-h-[90vh] overflow-y-auto"
+        aria-describedby="quick-schedule-description"
+      >
         <DialogHeader>
           <DialogTitle>Quick Schedule Goal</DialogTitle>
+          <p id="quick-schedule-description" className="sr-only">
+            Create and schedule a new goal with steps and tasks
+          </p>
         </DialogHeader>
 
         <div className="space-y-6">
           <div className="space-y-4">
+            {/* Visibility Selector */}
+            <div className="mb-4">
+              <VisibilitySelector
+                value={visibility}
+                onChange={setVisibility}
+              />
+            </div>
+
+            {/* Area Selection */}
             <div>
               <Label>Area</Label>
               <Select value={selectedArea} onValueChange={setSelectedArea}>
@@ -511,14 +541,30 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
                   </div>
                   {criterion.tasks.map((task, taskIndex) => (
                     <div key={task.id} className="flex items-center gap-2">
-                      <Input
-                        placeholder="Enter task"
-                        value={task.text}
-                        onChange={(e) =>
-                          handleUpdateTask(index, taskIndex, e.target.value)
-                        }
-                        className="flex-1"
-                      />
+                      <div className="flex-1">
+                        <Input
+                          placeholder="Enter task"
+                          value={task.text}
+                          onChange={(e) =>
+                            handleUpdateTask(index, taskIndex, e.target.value)
+                          }
+                        />
+                      </div>
+                      <div className="w-48">
+                        <Input
+                          type="date"
+                          value={task.dueDate ? task.dueDate.toISOString().split('T')[0] : ''}
+                          onChange={(e) => {
+                            const updatedTasks = [...criteria[index].tasks];
+                            updatedTasks[taskIndex] = {
+                              ...task,
+                              dueDate: e.target.value ? new Date(e.target.value) : undefined
+                            };
+                            handleUpdateCriteria(index, { tasks: updatedTasks });
+                          }}
+                          className="w-full"
+                        />
+                      </div>
                       <Button
                         type="button"
                         variant="ghost"

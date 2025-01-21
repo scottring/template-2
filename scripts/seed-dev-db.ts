@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import path from 'path';
 import * as admin from 'firebase-admin';
+import crypto from 'crypto';
 
 // Load environment variables from .env.development
 dotenv.config({ path: path.resolve(process.cwd(), '.env.development') });
@@ -29,12 +30,55 @@ const sampleData = {
   },
   goals: [
     {
-      name: 'Test Goal 1',
-      description: 'A sample goal for testing',
+      name: 'Morning Routine',
+      description: 'Daily morning routine',
       status: 'in_progress',
       startDate: new Date(),
-      targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      targetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      goalType: 'Routine',
+      steps: [
+        {
+          id: crypto.randomUUID(),
+          text: 'Wake up at 6am',
+          stepType: 'Routine',
+          isTracked: true,
+          selectedDays: ['M', 'Tu', 'W', 'Th', 'F'],
+          scheduledTimes: { 'M': ['06:00'], 'Tu': ['06:00'], 'W': ['06:00'], 'Th': ['06:00'], 'F': ['06:00'] }
+        }
+      ]
     },
+    {
+      name: 'Kitchen Renovation',
+      description: 'Renovate the kitchen',
+      status: 'not_started',
+      startDate: new Date(),
+      targetDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+      goalType: 'Project',
+      steps: [
+        {
+          id: crypto.randomUUID(),
+          text: 'Get contractor quotes',
+          stepType: 'One Time Task',
+          isTracked: true
+        }
+      ]
+    },
+    {
+      name: 'Buy New Laptop',
+      description: 'Purchase a new work laptop',
+      status: 'not_started',
+      startDate: new Date(),
+      targetDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+      goalType: 'One Time Task',
+      steps: [
+        {
+          id: crypto.randomUUID(),
+          text: 'Research models',
+          stepType: 'One Time Task',
+          isTracked: true
+        }
+      ]
+    }
   ],
   tasks: [
     {

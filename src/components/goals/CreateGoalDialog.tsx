@@ -647,15 +647,32 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
                             }}
                             className="h-4 w-4 rounded border-gray-300"
                           />
-                          <Input
-                            value={task.text}
-                            onChange={(e) => {
-                              const updatedTasks = [...step.tasks];
-                              updatedTasks[taskIndex] = { ...task, text: e.target.value };
-                              updateStep(index, { tasks: updatedTasks });
-                            }}
-                            placeholder="Enter task"
-                          />
+                          <div className="flex-1">
+                            <Input
+                              value={task.text}
+                              onChange={(e) => {
+                                const updatedTasks = [...step.tasks];
+                                updatedTasks[taskIndex] = { ...task, text: e.target.value };
+                                updateStep(index, { tasks: updatedTasks });
+                              }}
+                              placeholder="Enter task"
+                            />
+                          </div>
+                          <div className="w-48">
+                            <Input
+                              type="date"
+                              value={task.dueDate ? task.dueDate.toISOString().split('T')[0] : ''}
+                              onChange={(e) => {
+                                const updatedTasks = [...step.tasks];
+                                updatedTasks[taskIndex] = {
+                                  ...task,
+                                  dueDate: e.target.value ? new Date(e.target.value) : undefined
+                                };
+                                updateStep(index, { tasks: updatedTasks });
+                              }}
+                              className="w-full"
+                            />
+                          </div>
                           <Button
                             type="button"
                             variant="ghost"
