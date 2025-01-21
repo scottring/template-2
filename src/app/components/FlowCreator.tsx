@@ -69,7 +69,7 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
     name: '',
     description: '',
     targetDate: addMonths(new Date(), 1),
-    goalType: 'Tangible',
+    goalType: 'Project',
     areaId: '',
     steps: []
   });
@@ -513,7 +513,7 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                         ...prev,
                         steps: [...prev.steps, {
                           text: '',
-                          stepType: 'Tangible',
+                          stepType: 'Project',
                           tasks: [],
                           targetDate: addMonths(new Date(), 1)
                         }]
@@ -546,9 +546,9 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                                   ...step,
                                   stepType: value,
                                   // Reset frequency/targetDate when switching types
-                                  frequency: value === 'Habit' ? 1 : undefined,
-                                  frequencyType: value === 'Habit' ? 'week' : undefined,
-                                  targetDate: value === 'Tangible' ? addMonths(new Date(), 1) : undefined
+                                  frequency: value === 'Routine' ? 1 : undefined,
+                                  frequencyType: value === 'Routine' ? 'week' : undefined,
+                                  targetDate: (value === 'Project' || value === 'One Time Task') ? addMonths(new Date(), 1) : undefined
                                 };
                                 setData(prev => ({ ...prev, steps: newSteps }));
                               }}
@@ -557,12 +557,13 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="Habit">Habit</SelectItem>
-                                <SelectItem value="Tangible">Tangible</SelectItem>
+                                <SelectItem value="Routine">Routine</SelectItem>
+                                <SelectItem value="Project">Project</SelectItem>
+                                <SelectItem value="One Time Task">One Time Task</SelectItem>
                               </SelectContent>
                             </Select>
 
-                            {step.stepType === 'Habit' && (
+                            {step.stepType === 'Routine' && (
                               <>
                                 <Input
                                   type="number"
@@ -596,7 +597,7 @@ export function FlowCreator({ onComplete, onCancel }: FlowCreatorProps) {
                               </>
                             )}
 
-                            {step.stepType === 'Tangible' && (
+                            {(step.stepType === 'Project' || step.stepType === 'One Time Task') && (
                               <DatePicker
                                 selected={step.targetDate}
                                 onChange={(date) => {

@@ -109,11 +109,11 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
   const [newAreaName, setNewAreaName] = useState('');
   const [goalName, setGoalName] = useState('');
   const [goalDescription, setGoalDescription] = useState('');
-  const [goalType, setGoalType] = useState<GoalType>('Tangible');
+  const [goalType, setGoalType] = useState<GoalType>('Project');
   const [criteria, setCriteria] = useState<SuccessCriteriaInput[]>([{
     id: crypto.randomUUID(),
     text: '',
-    stepType: 'Tangible',
+    stepType: 'Project',
     isTracked: false,
     tasks: [],
     notes: []
@@ -130,7 +130,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
     setCriteria([...criteria, { 
       id: crypto.randomUUID(),
       text: '',
-      stepType: 'Tangible',
+      stepType: 'Project',
       isTracked: false,
       tasks: [],
       notes: []
@@ -282,7 +282,8 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
         if (!criterion.text) continue;
 
         await addItem({
-          type: criterion.stepType === 'Habit' ? 'habit' : 'tangible',
+          type: criterion.stepType === 'Routine' ? 'routine' :
+                criterion.stepType === 'Project' ? 'project' : 'one-time-task',
           referenceId: goalResult,
           stepId: criterion.id,
           schedule: {
@@ -310,7 +311,7 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
       setCriteria([{ 
         id: crypto.randomUUID(),
         text: '',
-        stepType: 'Tangible',
+        stepType: 'Project',
         isTracked: false,
         tasks: [],
         notes: []
@@ -380,8 +381,9 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
                   <SelectValue placeholder="Select goal type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Habit">Habit</SelectItem>
-                  <SelectItem value="Tangible">Tangible</SelectItem>
+                  <SelectItem value="Routine">Routine</SelectItem>
+                  <SelectItem value="Project">Project</SelectItem>
+                  <SelectItem value="One Time Task">One Time Task</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -454,8 +456,9 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Habit">Habit</SelectItem>
-                        <SelectItem value="Tangible">Tangible</SelectItem>
+                        <SelectItem value="Routine">Routine</SelectItem>
+                        <SelectItem value="Project">Project</SelectItem>
+                        <SelectItem value="One Time Task">One Time Task</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -468,8 +471,8 @@ export function QuickScheduleDialog({ open, onClose }: QuickScheduleDialogProps)
                         isTracked: e.target.checked,
                         ...(e.target.checked ? {
                           startDateTime: criterion.startDateTime || new Date(),
-                          timescale: criterion.stepType === 'Habit' ? (criterion.timescale || 'weekly') : undefined,
-                          frequency: criterion.stepType === 'Habit' ? (criterion.frequency || 1) : undefined,
+                          timescale: criterion.stepType === 'Routine' ? (criterion.timescale || 'weekly') : undefined,
+                          frequency: criterion.stepType === 'Routine' ? (criterion.frequency || 1) : undefined,
                           selectedDays: criterion.selectedDays || [],
                           repeatEndDate: criterion.repeatEndDate || (targetDate ? new Date(targetDate) : undefined)
                         } : {

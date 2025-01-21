@@ -114,7 +114,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
     steps: [{
       id: crypto.randomUUID(),
       text: '',
-      stepType: 'Tangible',
+      stepType: 'Project',
       isTracked: false,
       startDateTime: new Date(),
       endDateTime: undefined,
@@ -124,7 +124,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
     }],
     assignedTo: [],
     householdId: '',
-    goalType: 'Tangible'
+    goalType: 'Project'
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -165,7 +165,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
           const baseStep = {
             id: step.id,
             text: step.text.trim(),
-            stepType: step.stepType || 'Tangible',
+            stepType: step.stepType || 'Project',
             isTracked: step.isTracked || false,
             tasks: (step.tasks || []).map(task => ({
               id: task.id,
@@ -180,7 +180,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
             }))
           };
 
-          if (step.isTracked && step.stepType === 'Habit') {
+          if (step.isTracked && step.stepType === 'Routine') {
             return {
               ...baseStep,
               timescale: step.timescale || 'weekly',
@@ -206,7 +206,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
         progress: 0,
         householdId: user.householdId,
         areaId,
-        goalType: formData.goalType || 'Tangible'
+        goalType: formData.goalType || 'Project'
       };
 
       console.log('Goal data to be added:', goalData);
@@ -222,7 +222,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
         steps: [{
           id: crypto.randomUUID(),
           text: '',
-          stepType: 'Tangible',
+          stepType: 'Project',
           isTracked: false,
           startDateTime: new Date(),
           endDateTime: undefined,
@@ -232,7 +232,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
         }],
         assignedTo: [],
         householdId: user.householdId,
-        goalType: 'Tangible'
+        goalType: 'Project'
       });
       setSelectedArea('');
       setNewAreaName('');
@@ -251,7 +251,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
         {
           id: crypto.randomUUID(),
           text: '',
-          stepType: 'Tangible',
+          stepType: 'Project',
           isTracked: false,
           startDateTime: new Date(),
           endDateTime: undefined,
@@ -280,7 +280,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
         const updatedStep = { ...c, ...updates };
         
         // If changing from Habit to Tangible, remove habit-specific fields
-        if (updates.stepType === 'Tangible') {
+        if (updates.stepType === 'Project' || updates.stepType === 'One Time Task') {
           delete updatedStep.timescale;
           delete updatedStep.frequency;
           delete updatedStep.nextOccurrence;
@@ -308,7 +308,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
       steps: [{
         id: crypto.randomUUID(),
         text: '',
-        stepType: 'Tangible',
+        stepType: 'Project',
         isTracked: false,
         startDateTime: new Date(),
         endDateTime: undefined,
@@ -318,7 +318,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
       }],
       assignedTo: [],
       householdId: '',
-      goalType: 'Tangible'
+      goalType: 'Project'
     });
   };
 
@@ -380,8 +380,9 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
                   <SelectValue placeholder="Select goal type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Habit">Habit</SelectItem>
-                  <SelectItem value="Tangible">Tangible</SelectItem>
+                  <SelectItem value="Routine">Routine</SelectItem>
+                  <SelectItem value="Project">Project</SelectItem>
+                  <SelectItem value="One Time Task">One Time Task</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -453,8 +454,9 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Habit">Habit</SelectItem>
-                          <SelectItem value="Tangible">Tangible</SelectItem>
+                          <SelectItem value="Routine">Routine</SelectItem>
+                          <SelectItem value="Project">Project</SelectItem>
+                          <SelectItem value="One Time Task">One Time Task</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -466,9 +468,9 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
                           checked={step.isTracked}
                           onChange={(e) => updateStep(index, { 
                             isTracked: e.target.checked,
-                            timescale: e.target.checked && step.stepType === 'Habit' ? 'weekly' : undefined,
-                            frequency: e.target.checked && step.stepType === 'Habit' ? 1 : undefined,
-                            repeatEndDate: e.target.checked && step.stepType === 'Habit' ? formData.targetDate : undefined
+                            timescale: e.target.checked && step.stepType === 'Routine' ? 'weekly' : undefined,
+                            frequency: e.target.checked && step.stepType === 'Routine' ? 1 : undefined,
+                            repeatEndDate: e.target.checked && step.stepType === 'Routine' ? formData.targetDate : undefined
                           })}
                           className="h-4 w-4 rounded border-gray-300"
                         />
@@ -558,7 +560,7 @@ export function CreateGoalDialog({ open, onClose, defaultAreaId }: CreateGoalDia
                           ))}
 
                           {/* Repeat Settings - Only show for Habit steps */}
-                          {step.stepType === 'Habit' && (
+                          {step.stepType === 'Routine' && (
                             <div className="space-y-4">
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium text-gray-700">Repeat</Label>

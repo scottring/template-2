@@ -76,7 +76,7 @@ interface ScheduleState {
     goalId: string;
     stepId: string;
     text: string;
-    type: 'Habit' | 'Tangible';
+    type: 'Routine' | 'Project' | 'One Time Task';
   } | null;
 }
 
@@ -407,7 +407,7 @@ export function FlowPlanner({ goals, onComplete, onCancel }: FlowPlannerProps) {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <h3 className="text-xl font-semibold">{goals[currentGoalIndex].name}</h3>
-                          <Badge variant={goals[currentGoalIndex].goalType === 'Habit' ? 'secondary' : 'default'}>
+                          <Badge variant={goals[currentGoalIndex].goalType === 'Routine' ? 'secondary' : 'default'}>
                             {goals[currentGoalIndex].goalType}
                           </Badge>
                         </div>
@@ -433,7 +433,7 @@ export function FlowPlanner({ goals, onComplete, onCancel }: FlowPlannerProps) {
                                 <CheckCircle2 className="h-5 w-5 mt-0.5 text-muted-foreground" />
                                 <div>
                                   <p>{step.text}</p>
-                                  {step.stepType === 'Habit' && step.frequency && (
+                                  {step.stepType === 'Routine' && step.frequency && (
                                     <p className="text-sm text-muted-foreground">
                                       {step.frequency}x per {step.timescale || 'week'}
                                     </p>
@@ -521,11 +521,11 @@ export function FlowPlanner({ goals, onComplete, onCancel }: FlowPlannerProps) {
                               >
                                 <div className="flex items-center justify-between">
                                   <span>{step.text}</span>
-                                  <Badge variant={step.stepType === 'Habit' ? 'secondary' : 'default'}>
+                                  <Badge variant={step.stepType === 'Routine' ? 'secondary' : 'default'}>
                                     {step.stepType}
                                   </Badge>
                                 </div>
-                                {step.stepType === 'Habit' && step.frequency && (
+                                {step.stepType === 'Routine' && step.frequency && (
                                   <p className="text-sm text-muted-foreground mt-1">
                                     {step.frequency}x per {step.timescale || 'week'}
                                   </p>
@@ -543,7 +543,7 @@ export function FlowPlanner({ goals, onComplete, onCancel }: FlowPlannerProps) {
                 <Card className="col-span-3 p-4">
                   <ScrollArea className="h-[600px]">
                     {scheduleState.selectedStep ? (
-                      scheduleState.selectedStep.type === 'Habit' ? (
+                      scheduleState.selectedStep.type === 'Routine' ? (
                         // Habit scheduling - Weekly view
                         <Table>
                           <TableHeader>

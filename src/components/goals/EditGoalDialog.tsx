@@ -115,7 +115,7 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
           const baseStep = {
             id: step.id,
             text: step.text.trim(),
-            stepType: step.stepType || 'Tangible',
+            stepType: step.stepType || 'Project',
             isTracked: step.isTracked || false,
             tasks: (step.tasks || []).map(task => ({
               id: task.id,
@@ -136,7 +136,7 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
               repeatEndDate: step.repeatEndDate instanceof Date ? step.repeatEndDate : undefined,
               selectedDays: step.selectedDays || [],
               // Add habit-specific properties only if it's a Habit type
-              ...(step.stepType === 'Habit' ? {
+              ...(step.stepType === 'Routine' ? {
                 timescale: step.timescale || 'weekly',
                 frequency: step.frequency || 1,
                 nextOccurrence: getNextOccurrence(
@@ -176,7 +176,7 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
           id: crypto.randomUUID(),
           text: '',
           details: '',
-          stepType: 'Tangible' as const,
+          stepType: 'Project' as const,
           isTracked: false,
           startDateTime: new Date(),
           endDateTime: undefined,
@@ -205,7 +205,7 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
         const updatedStep = { ...s, ...updates };
         
         // If changing from Habit to Tangible, remove only habit-specific fields
-        if (updates.stepType === 'Tangible') {
+        if (updates.stepType === 'Project' || updates.stepType === 'One Time Task') {
           delete updatedStep.timescale;
           delete updatedStep.frequency;
           delete updatedStep.nextOccurrence;
@@ -217,8 +217,8 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
             delete updatedStep.selectedDays;
             delete updatedStep.scheduledTimes;
           }
-        } else if (updates.stepType === 'Habit' && updatedStep.isTracked) {
-          // When changing to Habit, initialize habit fields if tracked
+        } else if (updates.stepType === 'Routine' && updatedStep.isTracked) {
+          // When changing to Routine, initialize routine fields if tracked
           updatedStep.startDateTime = updatedStep.startDateTime || new Date();
           updatedStep.timescale = 'weekly';
           updatedStep.frequency = 1;
@@ -285,8 +285,9 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
                   <SelectValue placeholder="Select goal type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Habit">Habit</SelectItem>
-                  <SelectItem value="Tangible">Tangible</SelectItem>
+                  <SelectItem value="Routine">Routine</SelectItem>
+                  <SelectItem value="Project">Project</SelectItem>
+                  <SelectItem value="One Time Task">One Time Task</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -378,8 +379,8 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
                       <Select
                         value={step.stepType}
                         onValueChange={(value: GoalType) => {
-                          if (value === 'Tangible') {
-                            // When changing to Tangible, keep scheduling but remove habit-specific fields
+                          if (value === 'Project' || value === 'One Time Task') {
+                            // When changing to Project/One Time Task, keep scheduling but remove routine-specific fields
                             const { timescale, frequency, nextOccurrence, ...baseStep } = step;
                             updateStep(index, { 
                               ...baseStep, 
@@ -411,8 +412,9 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Habit">Habit</SelectItem>
-                          <SelectItem value="Tangible">Tangible</SelectItem>
+                          <SelectItem value="Routine">Routine</SelectItem>
+                          <SelectItem value="Project">Project</SelectItem>
+                          <SelectItem value="One Time Task">One Time Task</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -426,8 +428,8 @@ export function EditGoalDialog({ open, onClose, goal }: EditGoalDialogProps) {
                             isTracked: e.target.checked,
                             ...(e.target.checked ? {
                               startDateTime: step.startDateTime || new Date(),
-                              timescale: step.stepType === 'Habit' ? (step.timescale || 'weekly') : undefined,
-                              frequency: step.stepType === 'Habit' ? (step.frequency || 1) : undefined,
+                              timescale: step.stepType === 'Routine' ? (step.timescale || 'weekly') : undefined,
+                              frequency: step.stepType === 'Routine' ? (step.frequency || 1) : undefined,
                               selectedDays: step.selectedDays || [],
                               repeatEndDate: step.repeatEndDate || formData.targetDate
                             } : {

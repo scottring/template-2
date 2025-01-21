@@ -66,7 +66,14 @@ export function ItineraryView({ date, type, timeScale }: ItineraryViewProps) {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <span className="text-gray-900">{item.type}</span>
+                <span className="text-gray-900">
+                  {item.type === 'routine' ? 'Routine' :
+                   item.type === 'project' ? 'Project' :
+                   item.type === 'one-time-task' ? 'One Time Task' :
+                   item.type === 'event' ? 'Event' :
+                   item.type === 'task' ? 'Task' :
+                   item.type}
+                </span>
                 <span className="text-gray-500">{item.notes}</span>
               </div>
               <select

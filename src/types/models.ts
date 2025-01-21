@@ -72,7 +72,7 @@ export interface Task extends BaseItem {
   notes: Note[];
 }
 
-export type GoalType = 'Habit' | 'Tangible';
+export type GoalType = 'Routine' | 'Project' | 'One Time Task';
 
 export interface Goal extends BaseItem {
   name: string;
@@ -137,7 +137,7 @@ export interface Note {
 }
 
 export interface ItineraryItem extends BaseItem {
-  type: 'task' | 'habit' | 'event' | 'tangible';
+  type: 'task' | 'routine' | 'event' | 'project' | 'one-time-task';
   referenceId: string;
   stepId?: string;
   schedule?: Schedule;
