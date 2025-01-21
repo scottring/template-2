@@ -1,29 +1,32 @@
 'use client';
 
 import React, { useState } from 'react';
+import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { ClipboardList, DollarSign, Scale, Calendar, Plus, FolderPlus, Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { ClipboardList, DollarSign, Scale, Calendar as CalendarIcon, Plus, FolderPlus, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Goal } from '@/types/models';
+import { Goal, StepTask } from '@/types/models';
 
 interface GoalDetailViewProps {
   goal: Goal;
   onUpdate: (updatedGoal: Goal) => void;
 }
 
-interface StepTask {
-  id: string;
-  text: string;
-  status: 'pending' | 'completed' | 'cancelled';
-  isNew?: boolean;
-}
-
-const FlipTask = ({ task, onComplete, isNew }: { 
-  task: StepTask; 
+const FlipTask = ({ 
+  task, 
+  onComplete, 
+  onDateChange,
+  isNew 
+}: {
+  task: StepTask;
   onComplete: () => void;
+  onDateChange: (date: Date | undefined) => void;
   isNew?: boolean;
 }) => {
   return (
@@ -38,6 +41,26 @@ const FlipTask = ({ task, onComplete, isNew }: {
       <span className={task.status === 'completed' ? 'text-muted-foreground line-through' : ''}>
         {task.text}
       </span>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-muted-foreground hover:text-foreground"
+          >
+            <CalendarIcon className="w-4 h-4 mr-2" />
+            {task.dueDate ? format(task.dueDate, 'MMM d') : 'Set due date'}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="end">
+          <Calendar
+            mode="single"
+            selected={task.dueDate}
+            onSelect={onDateChange}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
     </div>
   );
 };
@@ -75,19 +98,40 @@ export default function GoalDetailView({ goal, onUpdate }: GoalDetailViewProps) 
     onUpdate({ ...goal, steps: updatedSteps });
   };
 
+  const handleTaskDateChange = (stepId: string, taskId: string, date: Date | undefined) => {
+    const updatedSteps = goal.steps.map(step => {
+      if (step.id === stepId) {
+        return {
+          ...step,
+          tasks: step.tasks.map(task => 
+            task.id === taskId 
+              ? { ...task, dueDate: date }
+              : task
+          )
+        };
+      }
+      return step;
+    });
+
+    onUpdate({ ...goal, steps: updatedSteps });
+  };
+
   const addTask = (stepId: string) => {
     if (!newTaskText[stepId]) return;
     
     const updatedSteps = goal.steps.map(step => {
       if (step.id === stepId) {
+        const newTask = {
+          id: crypto.randomUUID(),
+          text: newTaskText[stepId],
+          status: 'pending' as const,
+          isNew: true,
+          dueDate: undefined
+        };
+        
         return {
           ...step,
-          tasks: [...step.tasks, {
-            id: crypto.randomUUID(),
-            text: newTaskText[stepId],
-            status: 'pending' as const,
-            isNew: true
-          }]
+          tasks: [...step.tasks, newTask]
         };
       }
       return step;
@@ -133,7 +177,7 @@ export default function GoalDetailView({ goal, onUpdate }: GoalDetailViewProps) 
         <div>
           <h1 className="text-2xl font-bold">{goal.name}</h1>
           <div className="flex items-center mt-2 text-muted-foreground">
-            <Calendar className="w-4 h-4 mr-2" />
+            <CalendarIcon className="w-4 h-4 mr-2" />
             <span>Due: {goal.targetDate?.toLocaleDateString()}</span>
           </div>
         </div>
@@ -187,6 +231,7 @@ export default function GoalDetailView({ goal, onUpdate }: GoalDetailViewProps) 
                         key={task.id}
                         task={task}
                         onComplete={() => handleTaskCompletion(step.id, task.id)}
+                        onDateChange={(date) => handleTaskDateChange(step.id, task.id, date)}
                         isNew={task.isNew}
                       />
                     ))}
