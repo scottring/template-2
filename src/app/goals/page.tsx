@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import useGoalStore from '@/lib/stores/useGoalStore';
-import { Goal } from '@/types/models';
+import { Goal, GoalType } from '@/types/models';
 import { useRouter } from 'next/navigation';
-import { PlusIcon, Share2, Trash2, Target, Calendar, ArrowUpRight, Loader2, Plus } from 'lucide-react';
+import { Plus, Share2, Target, Calendar, Loader2, Trash, CheckCircle } from 'lucide-react';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { CreateGoalDialog } from '@/components/goals/CreateGoalDialog';
 import { ShareDialog } from '@/components/shared/ShareDialog';
 import { SharedIndicator } from '@/components/shared/SharedIndicator';
@@ -40,7 +41,11 @@ export default function GoalsPage() {
   
   const goals = useGoalStore(state => state.goals);
   const fetchGoals = useGoalStore(state => state.fetchGoals);
-  const { addGoal } = useGoalStore();
+  const { addGoal, deleteGoal, completeGoal } = useGoalStore();
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
+  const [completingGoalId, setCompletingGoalId] = useState<string | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
+  const filteredGoals = showCompleted ? goals : goals.filter(goal => goal.status !== 'completed');
   
   useEffect(() => {
     if (!user?.householdId) {
@@ -69,11 +74,11 @@ export default function GoalsPage() {
       id: '', // This will be set by Firebase
       name: data.name,
       description: data.description,
-      areaId: '', // This should be selected in the flow or set to default
+      areaId: data.areaId,
       startDate: new Date(),
       targetDate: data.targetDate,
       progress: 0,
-      goalType: 'tangible' as GoalType,
+      goalType: data.goalType,
       status: 'in_progress',
       steps: data.steps.map((step: any) => ({
         id: '', // This will be set when adding to Firebase
@@ -90,7 +95,9 @@ export default function GoalsPage() {
       createdBy: user.uid,
       updatedBy: user.uid,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
+      ownerId: user.uid,
+      visibility: 'private'
     };
 
     await addGoal(goal);
@@ -120,9 +127,18 @@ export default function GoalsPage() {
     <div className="container mx-auto py-8">
       <div className="max-w-7xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-            Goals
-          </h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+              Goals
+            </h1>
+            <Button
+              variant="ghost"
+              onClick={() => setShowCompleted(!showCompleted)}
+              className="text-sm text-muted-foreground"
+            >
+              {showCompleted ? 'Showing All Goals' : 'Show Completed Goals'}
+            </Button>
+          </div>
           <Button
             onClick={() => setIsCreating(true)}
             className="flex items-center gap-2"
@@ -138,15 +154,12 @@ export default function GoalsPage() {
           initial="hidden"
           animate="show"
         >
-          {goals.map((goal) => (
+          {filteredGoals.map((goal) => (
             <motion.div
               key={goal.id}
               variants={item}
               className="group relative"
-              onClick={() => {
-                console.log('Navigating to goal:', goal.id);
-                router.push(`/goals/${goal.id}`);
-              }}
+              onClick={() => router.push(`/goals/${goal.id}`)}
             >
               <Card className="cursor-pointer hover:shadow-md transition-shadow backdrop-blur-sm bg-background/95">
                 <CardContent className="p-6">
@@ -166,7 +179,7 @@ export default function GoalsPage() {
                     <Badge variant={goal.status === 'completed' ? 'default' : 'secondary'}>
                       {goal.status === 'completed' ? 'Completed' : 'In Progress'}
                     </Badge>
-                    {typeof goal.targetDate === 'string' && !isNaN(new Date(goal.targetDate).getTime()) && (
+                    {goal.targetDate && (
                       <Badge variant="outline" className="gap-1">
                         <Calendar className="h-3 w-3" />
                         {new Date(goal.targetDate).toLocaleDateString()}
@@ -174,7 +187,7 @@ export default function GoalsPage() {
                     )}
                   </div>
 
-                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -186,13 +199,35 @@ export default function GoalsPage() {
                     >
                       <Share2 className="h-4 w-4" />
                     </Button>
+                    <Button
+                      variant="ghost" 
+                      size="sm"
+                      className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCompletingGoalId(goal.id);
+                      }}
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmingDeleteId(goal.id);
+                      }}
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             </motion.div>
           ))}
 
-          {goals.length === 0 && (
+          {filteredGoals.length === 0 && (
             <motion.div
               variants={item}
               className="col-span-full"
@@ -229,6 +264,59 @@ export default function GoalsPage() {
           itemName={sharingGoal.name}
         />
       )}
+
+      <Dialog open={!!confirmingDeleteId} onOpenChange={(open) => !open && setConfirmingDeleteId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this goal? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmingDeleteId(null)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={async () => {
+                if (confirmingDeleteId) {
+                  await deleteGoal(confirmingDeleteId);
+                  setConfirmingDeleteId(null);
+                }
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!completingGoalId} onOpenChange={(open) => !open && setCompletingGoalId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Complete Goal</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to mark this goal as completed?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompletingGoalId(null)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={async () => {
+                if (completingGoalId) {
+                  await completeGoal(completingGoalId);
+                  setCompletingGoalId(null);
+                }
+              }}
+            >
+              Complete Goal
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

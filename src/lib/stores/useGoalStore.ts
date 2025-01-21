@@ -15,6 +15,8 @@ import {
   serverTimestamp,
   DocumentData
 } from 'firebase/firestore';
+import { toFirestoreDate, fromFirestoreDate, validateDate } from '@/lib/utils/dateUtils';
+import { isValid } from 'date-fns';
 import { db } from '@/lib/firebase/firebase';
 import { Goal, Task } from '@/types/models';
 
@@ -23,47 +25,52 @@ interface GoalStore {
   loading: boolean;
   error: string | null;
   
-  // Core goal operations
   fetchGoals: (householdId: string) => Promise<void>;
   addGoal: (goal: Partial<Goal>) => Promise<string>;
   updateGoal: (goalId: string, updates: Partial<Goal>) => Promise<void>;
   deleteGoal: (goalId: string) => Promise<void>;
+  completeGoal: (goalId: string) => Promise<void>;
   migrateGoals: (householdId: string) => Promise<void>;
   
-  // Goal organization
   getGoalsByArea: (areaId: string) => Goal[];
   getGoalsByStatus: (status: Goal['status']) => Goal[];
   getUpcomingGoals: (days: number) => Goal[];
 }
 
 const convertFirestoreTimestamps = (data: DocumentData): Partial<Goal> => {
+  const convertDate = (date: any): Date => {
+    try {
+      if (date instanceof Timestamp) {
+        return date.toDate();
+      }
+      if (date instanceof Date) {
+        return date;
+      }
+      if (typeof date === 'string') {
+        const d = new Date(date);
+        if (isValid(d)) return d;
+      }
+      console.log('Invalid date, using current date:', date);
+      return new Date();
+    } catch (e) {
+      console.error('Error converting date:', date, e);
+      return new Date();
+    }
+  };
+
   return {
     ...data,
-    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : 
-               data.createdAt instanceof Date ? data.createdAt : 
-               new Date(),
-    updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : 
-               data.updatedAt instanceof Date ? data.updatedAt : 
-               new Date(),
-    startDate: data.startDate instanceof Timestamp ? data.startDate.toDate() : 
-               data.startDate instanceof Date ? data.startDate : 
-               new Date(),
-    targetDate: data.targetDate instanceof Timestamp ? data.targetDate.toDate() : 
-                data.targetDate instanceof Date ? data.targetDate : 
-                data.targetDate ? new Date(data.targetDate) : undefined,
+    createdAt: convertDate(data.createdAt),
+    updatedAt: convertDate(data.updatedAt),
+    startDate: convertDate(data.startDate),
+    targetDate: data.targetDate ? convertDate(data.targetDate) : undefined,
     steps: data.steps?.map((step: any) => ({
       ...step,
-      nextOccurrence: step.nextOccurrence instanceof Timestamp ? step.nextOccurrence.toDate() :
-                     step.nextOccurrence instanceof Date ? step.nextOccurrence :
-                     step.nextOccurrence ? new Date(step.nextOccurrence) : undefined,
-      repeatEndDate: step.repeatEndDate instanceof Timestamp ? step.repeatEndDate.toDate() :
-                    step.repeatEndDate instanceof Date ? step.repeatEndDate :
-                    step.repeatEndDate ? new Date(step.repeatEndDate) : undefined,
+      nextOccurrence: convertDate(step.nextOccurrence),
+      repeatEndDate: convertDate(step.repeatEndDate),
       tasks: (step.tasks || []).map((task: any) => ({
         ...task,
-        dueDate: task.dueDate instanceof Timestamp ? task.dueDate.toDate() :
-                task.dueDate instanceof Date ? task.dueDate :
-                task.dueDate ? new Date(task.dueDate) : undefined
+        dueDate: convertDate(task.dueDate)
       })),
       notes: step.notes || []
     })) || []
@@ -117,17 +124,25 @@ const useGoalStore = create<GoalStore>((set, get) => ({
         
         const goals = snapshot.docs.map(doc => {
           const data = doc.data();
-          console.log('Processing goal:', {
+          console.log('Raw Firestore data:', {
             id: doc.id,
-            name: data.name,
-            status: data.status,
-            criteria: data.successCriteria?.length || 0,
-            householdId: data.householdId
+            ...data
           });
-          return {
-            ...convertFirestoreTimestamps(data),
+          
+          const convertedData = convertFirestoreTimestamps(data);
+          console.log('Converted data:', {
+            id: doc.id,
+            ...convertedData
+          });
+          
+          // Check for required fields
+          const goal = {
+            ...convertedData,
             id: doc.id,
           };
+          
+          console.log('Final goal object:', goal);
+          return goal;
         }) as Goal[];
         
         console.log('Setting goals in store:', {
@@ -180,12 +195,10 @@ const useGoalStore = create<GoalStore>((set, get) => ({
   addGoal: async (goal: Partial<Goal>) => {
     set({ loading: true, error: null });
     try {
-      // Ensure we have required fields
       if (!goal.householdId) {
         throw new Error('householdId is required');
       }
 
-      // Clean and validate all fields before sending to Firestore
       const cleanGoal = {
         householdId: goal.householdId,
         name: goal.name || '',
@@ -204,16 +217,30 @@ const useGoalStore = create<GoalStore>((set, get) => ({
           text: step.text || '',
           stepType: step.stepType || 'Tangible',
           isTracked: Boolean(step.isTracked),
-          tasks: (step.tasks || []).map(task => ({
-            id: task.id || crypto.randomUUID(),
-            text: task.text || '',
-            completed: Boolean(task.completed)
-          })),
-          notes: (step.notes || []).map(note => ({
-            id: note.id || crypto.randomUUID(),
-            text: note.text || '',
-            timestamp: note.timestamp ? Timestamp.fromDate(note.timestamp) : serverTimestamp()
-          })),
+            tasks: (step.tasks || []).map(task => {
+              // Initialize dueDate if undefined
+              const initialDueDate = task.dueDate || null;
+              
+              // Convert to Firestore timestamp if valid
+              const cleanDueDate = initialDueDate && isValid(new Date(initialDueDate))
+                ? Timestamp.fromDate(new Date(initialDueDate))
+                : null;
+              
+              console.log('Task initialization:', {
+                id: task.id,
+                initialDueDate,
+                cleanDueDate,
+                isValid: initialDueDate ? isValid(new Date(initialDueDate)) : false
+              });
+              
+              return {
+                id: task.id || crypto.randomUUID(),
+                text: task.text || '',
+                status: task.status || 'pending',
+                dueDate: cleanDueDate
+              };
+            }),
+          notes: step.notes || [],
           selectedDays: step.selectedDays || [],
           scheduledTimes: step.scheduledTimes || {},
           frequency: step.frequency || 1,
@@ -249,47 +276,68 @@ const useGoalStore = create<GoalStore>((set, get) => ({
   updateGoal: async (goalId: string, updates: Partial<Goal>) => {
     set({ loading: true, error: null });
     try {
-      const updateData = {
+      console.log('Starting goal update for:', goalId);
+      console.log('Raw updates:', updates);
+
+      const cleanUpdates = {
         ...updates,
         updatedAt: serverTimestamp(),
-        startDate: updates.startDate ? Timestamp.fromDate(updates.startDate) : undefined,
-        targetDate: updates.targetDate ? Timestamp.fromDate(updates.targetDate) : undefined,
-        steps: updates.steps?.map(step => ({
-          id: step.id,
-          text: step.text,
-          stepType: step.stepType,
-          isTracked: step.isTracked,
-          tasks: (step.tasks || []).map(task => ({
-            id: task.id,
-            text: task.text,
-            status: task.status,
-            dueDate: task.dueDate ? Timestamp.fromDate(new Date(task.dueDate)) : undefined
-          })),
-          notes: step.notes || [],
-          nextOccurrence: step.nextOccurrence ? Timestamp.fromDate(new Date(step.nextOccurrence)) : undefined,
-          repeatEndDate: step.repeatEndDate ? Timestamp.fromDate(new Date(step.repeatEndDate)) : undefined
-        }))
+        startDate: updates.startDate && isValid(new Date(updates.startDate)) 
+          ? Timestamp.fromDate(new Date(updates.startDate)) 
+          : undefined,
+        targetDate: updates.targetDate && isValid(new Date(updates.targetDate))
+          ? Timestamp.fromDate(new Date(updates.targetDate))
+          : undefined,
+        steps: updates.steps?.map(step => {
+          console.log('Processing step:', step.id);
+          return {
+            ...step,
+            tasks: (step.tasks || []).map(task => {
+              const cleanDueDate = task.dueDate && isValid(new Date(task.dueDate))
+                ? Timestamp.fromDate(new Date(task.dueDate))
+                : null;
+              
+              console.log('Task date conversion:', {
+                input: task.dueDate,
+                output: cleanDueDate,
+                isValid: task.dueDate ? isValid(new Date(task.dueDate)) : false
+              });
+              
+              return {
+                ...task,
+                dueDate: cleanDueDate
+              };
+            }),
+            nextOccurrence: step.nextOccurrence && isValid(new Date(step.nextOccurrence))
+              ? Timestamp.fromDate(new Date(step.nextOccurrence))
+              : undefined,
+            repeatEndDate: step.repeatEndDate && isValid(new Date(step.repeatEndDate))
+              ? Timestamp.fromDate(new Date(step.repeatEndDate))
+              : undefined
+          };
+        })
       };
       
-      // Remove any undefined values before sending to Firestore
-      const cleanUpdateData = removeUndefined(updateData);
+      const cleanUpdateData = removeUndefined(cleanUpdates);
+      console.log('Clean update data:', cleanUpdateData);
       
-      console.log('Updating goal with data:', cleanUpdateData);
       await updateDoc(doc(db, 'goals', goalId), cleanUpdateData);
       
-      // Fetch the updated document
       const docSnap = await getDoc(doc(db, 'goals', goalId));
-      const data = docSnap.data();
+      if (!docSnap.exists()) {
+        throw new Error('Goal document not found');
+      }
       
+      const data = docSnap.data();
       if (data) {
-        // Update the local state with the converted timestamps
+        const updatedGoal = {
+          ...convertFirestoreTimestamps(data),
+          id: goalId
+        } as Goal;
+        
         set(state => ({
-          goals: state.goals.map(goal => 
-            goal.id === goalId ? {
-              ...goal,
-              ...convertFirestoreTimestamps(data),
-              id: goalId
-            } : goal
+          goals: state.goals.map(g => 
+            g.id === goalId ? updatedGoal : g
           ),
           loading: false
         }));
@@ -311,6 +359,26 @@ const useGoalStore = create<GoalStore>((set, get) => ({
     } catch (error) {
       console.error('Error deleting goal:', error);
       set({ error: 'Failed to delete goal', loading: false });
+    }
+  },
+
+  completeGoal: async (goalId: string) => {
+    set({ loading: true, error: null });
+    try {
+      await updateDoc(doc(db, 'goals', goalId), {
+        status: 'completed',
+        progress: 100,
+        updatedAt: serverTimestamp()
+      });
+      set(state => ({
+        goals: state.goals.map(goal => 
+          goal.id === goalId ? {...goal, status: 'completed', progress: 100} : goal
+        ),
+        loading: false
+      }));
+    } catch (error) {
+      console.error('Error completing goal:', error);
+      set({ error: 'Failed to complete goal', loading: false });
     }
   },
 

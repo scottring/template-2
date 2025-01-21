@@ -1,93 +1,42 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { format, isValid } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import DatePicker from "react-datepicker";
-import { ClipboardList, DollarSign, Scale, Plus, FolderPlus, Pencil, Calendar as CalendarIcon } from 'lucide-react';
-import { Calendar as DateCalendar } from '@/components/ui/calendar';
-import "react-datepicker/dist/react-datepicker.css";
+import { ClipboardList, DollarSign, Scale, Plus, FolderPlus, Pencil, Calendar as CalendarIcon, Loader2, AlertCircle } from 'lucide-react';
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from '@/lib/utils';
-import { Goal, StepTask } from '@/types/models';
+import { Goal, StepTask, GoalType } from '@/types/models';
 
 interface GoalDetailViewProps {
   goal: Goal;
   onUpdate: (updatedGoal: Goal) => void;
+  disabled?: boolean;
 }
 
-interface FlipTaskProps {
-  task: StepTask;
-  onComplete: () => void;
-  onDateChange: (date: Date | undefined) => void;
-}
-
-const FlipTask = ({ task, onComplete, onDateChange }: FlipTaskProps) => {
-  const [isFlipped, setIsFlipped] = useState(false);
-  
-  // Format the date only if it's valid
-  const formattedDate = task.dueDate && isValid(task.dueDate) ? format(task.dueDate, 'MMM d, yyyy') : undefined;
-
-  return (
-    <div className={cn(
-      "flex items-center gap-2 p-2 rounded-lg transition-all duration-300 ease-in-out",
-      task.isNew && "animate-flip-in",
-      task.status === 'completed' && "opacity-50"
-    )}>
-      <Checkbox
-        id={task.id}
-        checked={task.status === 'completed'}
-        onCheckedChange={() => {
-          console.log('Checkbox clicked, current status:', task.status);
-          onComplete();
-        }}
-      />
-      <label
-        htmlFor={task.id}
-        className={cn(
-          "flex-1 cursor-pointer",
-          task.status === 'completed' && "line-through"
-        )}
-      >
-        {task.text}
-      </label>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            className={cn(
-              "w-[280px] justify-start text-left font-normal",
-              !task.dueDate && "text-muted-foreground"
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {formattedDate || <span>Set due date</span>}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0">
-          <DateCalendar
-            mode="single"
-            selected={task.dueDate && isValid(task.dueDate) ? task.dueDate : undefined}
-            onSelect={(date: Date | undefined) => {
-              console.log('Date selected:', date);
-              onDateChange(date);
-            }}
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-};
-
-export default function GoalDetailView({ goal, onUpdate }: GoalDetailViewProps) {
+export default function GoalDetailView({ goal, onUpdate, disabled = false }: GoalDetailViewProps) {
   const [newTaskText, setNewTaskText] = useState<{ [key: string]: string }>({});
   const [newStepText, setNewStepText] = useState('');
   const [showNewStep, setShowNewStep] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const taskRefs = useRef<{ [key: string]: HTMLDivElement }>({});
+
+  if (!goal) {
+    return <div>Loading goal details...</div>;
+  }
 
   const calculateProgress = () => {
     const totalTasks = goal.steps.reduce((acc, step) => 
@@ -99,252 +48,484 @@ export default function GoalDetailView({ goal, onUpdate }: GoalDetailViewProps) 
     return totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   };
 
-  const handleTaskCompletion = (stepIndex: number, taskIndex: number) => {
-    const step = goal.steps[stepIndex];
-    const task = step.tasks[taskIndex];
-    
-    const updatedSteps = [...goal.steps];
-    updatedSteps[stepIndex] = {
-      ...step,
-      tasks: step.tasks.map((t, i) => 
-        i === taskIndex
-          ? { ...t, status: t.status === 'completed' ? ('pending' as const) : ('completed' as const) }
-          : t
-      )
-    };
-    
-    onUpdate({ ...goal, steps: updatedSteps });
+  const focusTask = (stepId: string, taskId: string) => {
+    taskRefs.current[`${stepId}-${taskId}`]?.focus();
   };
 
-  const handleTaskDateChange = (stepId: string, taskId: string, date: Date | undefined) => {
-    console.log('Handling date change for step:', stepId, 'task:', taskId, 'date:', date);
-    const updatedSteps = goal.steps.map(step => {
-      if (step.id === stepId) {
-        console.log('Updating task date from', step.tasks.find(t => t.id === taskId)?.dueDate, 'to', date);
-        return {
-          ...step,
-          tasks: step.tasks.map(task => {
-            if (task.id === taskId) {
-              return { ...task, dueDate: date };
-            }
-            return task;
-          })
-        };
-      }
-      return step;
-    });
-
-    console.log('Calling onUpdate with updated steps');
-    onUpdate({ ...goal, steps: updatedSteps });
+  const handleTaskKeyDown = (e: React.KeyboardEvent, stepId: string, taskId: string, taskIndex: number, tasks: StepTask[]) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleTaskStatusChange(stepId, taskId, tasks[taskIndex].status !== 'completed');
+    } else if (e.key === 'ArrowDown' && taskIndex < tasks.length - 1) {
+      e.preventDefault();
+      focusTask(stepId, tasks[taskIndex + 1].id);
+    } else if (e.key === 'ArrowUp' && taskIndex > 0) {
+      e.preventDefault();
+      focusTask(stepId, tasks[taskIndex - 1].id);
+    }
   };
 
-  const addTask = (stepId: string) => {
-    if (!newTaskText[stepId]) return;
-    
-    const updatedSteps = goal.steps.map(step => {
-      if (step.id === stepId) {
-        const newTask = {
-          id: crypto.randomUUID(),
-          text: newTaskText[stepId],
-          status: 'pending' as const,
-          isNew: true,
-          dueDate: undefined
-        };
-        
-        return {
-          ...step,
-          tasks: [...step.tasks, newTask]
-        };
-      }
-      return step;
-    });
-
-    onUpdate({ ...goal, steps: updatedSteps });
-    setNewTaskText(prev => ({ ...prev, [stepId]: '' }));
-  };
-
-  const addStep = () => {
-    if (!newStepText) return;
-    
-    const newStep = {
-      id: crypto.randomUUID(),
-      text: newStepText,
-      stepType: 'Project' as const,
-      isTracked: true,
-      tasks: [],
-      notes: [],
-      isNew: true
-    };
-    
-    onUpdate({
+  const handleTaskStatusChange = (stepId: string, taskId: string, completed: boolean) => {
+    const updatedGoal: Goal = {
       ...goal,
-      steps: [...goal.steps, newStep]
-    });
+      steps: goal.steps.map(step => {
+        if (step.id === stepId) {
+          return {
+            ...step,
+            tasks: step.tasks.map(task => {
+              if (task.id === taskId) {
+                return {
+                  ...task,
+                  status: completed ? 'completed' as const : 'pending' as const
+                };
+              }
+              return task;
+            })
+          };
+        }
+        return step;
+      })
+    };
+    onUpdate(updatedGoal);
+  };
+
+  const handleAddTask = async (stepId: string) => {
+    if (!newTaskText[stepId]?.trim()) return null;
+
+    const newTask = {
+      id: crypto.randomUUID(),
+      text: newTaskText[stepId],
+      status: 'pending' as const
+    };
+
+    const updatedGoal: Goal = {
+      ...goal,
+      steps: goal.steps.map(step => {
+        if (step.id === stepId) {
+          return {
+            ...step,
+            tasks: [...step.tasks, newTask]
+          };
+        }
+        return step;
+      })
+    };
+
+    await onUpdate(updatedGoal);
+    setNewTaskText(prev => ({ ...prev, [stepId]: '' }));
+    return newTask;
+  };
+
+  const handleAddStep = () => {
+    if (!newStepText.trim()) return;
+
+    const updatedGoal: Goal = {
+      ...goal,
+      steps: [
+        ...goal.steps,
+        {
+          id: crypto.randomUUID(),
+          text: newStepText,
+          stepType: 'Project' as GoalType,
+          isTracked: true,
+          tasks: [],
+          notes: []
+        }
+      ]
+    };
+    onUpdate(updatedGoal);
     setNewStepText('');
     setShowNewStep(false);
   };
 
-  const getStepIcon = (index: number) => {
-    const icons = [
-      <ClipboardList key="clipboard" className="w-5 h-5" />,
-      <DollarSign key="dollar" className="w-5 h-5" />,
-      <Scale key="scale" className="w-5 h-5" />
-    ];
-    return icons[index % icons.length];
-  };
-
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold">{goal.name}</h1>
-          <div className="flex items-center mt-2 text-muted-foreground">
-            <CalendarIcon className="w-4 h-4 mr-2" />
-            <span>Due: {goal.targetDate && isValid(new Date(goal.targetDate)) ? format(new Date(goal.targetDate), 'MMM d, yyyy') : 'No due date set'}</span>
-          </div>
-        </div>
-        <button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90">
-          <Pencil className="w-4 h-4 mr-2 inline-block" />
-          Edit Goal
-        </button>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Progress Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <Progress value={calculateProgress()} className="h-2" />
-            <div className="flex justify-between mt-2 text-sm text-muted-foreground">
-              <span>{calculateProgress()}% Complete</span>
-              <span>{goal.steps.length} Items</span>
+    <>
+      <button 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:p-4 focus:bg-background focus:rounded-lg focus:shadow-lg"
+        onClick={() => {
+          const firstTask = document.querySelector('[role="listitem"]');
+          (firstTask as HTMLElement)?.focus();
+        }}
+      >
+        Skip to tasks
+      </button>
+      <div id="datepicker-portal" />
+      <div className="max-w-4xl mx-auto space-y-6 relative">
+        {disabled && (
+          <div className="absolute inset-0 bg-background/50 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+            <div className="flex items-center gap-2 bg-background p-4 rounded-lg shadow-lg">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Saving changes...</span>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        )}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold">{goal.name}</h1>
+            <div className="flex items-center mt-2 text-muted-foreground">
+              <CalendarIcon className="w-4 h-4 mr-2" />
+              <span>Due: {goal.targetDate && isValid(new Date(goal.targetDate)) ? format(new Date(goal.targetDate), 'MMM d, yyyy') : 'No due date set'}</span>
+            </div>
+          </div>
+          <button
+            aria-label={isEditMode ? 'Cancel editing goal' : 'Edit goal'}
+            className={cn(
+              "px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center",
+              isEditMode 
+                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                : "bg-primary text-primary-foreground"
+            )}
+            onClick={() => setIsEditMode(!isEditMode)}
+            disabled={disabled}
+          >
+            {disabled ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Pencil className="w-4 h-4 mr-2" />
+            )}
+            {isEditMode ? 'Cancel Edit' : 'Edit Goal'}
+          </button>
+        </div>
 
-      <div className="grid gap-4">
-        {goal.steps.map((step, index) => (
-          <Card key={step.id} className={cn(
-            "hover:shadow-lg transition-shadow",
-            step.isNew && "animate-flip-in origin-top"
-          )}>
-            <CardContent className="p-6">
-              <div className="flex items-start space-x-4">
-                <div className="flex items-center space-x-4">
-                  <div className="p-3 bg-primary/10 rounded-lg">
-                    {getStepIcon(index)}
+        <Card>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Progress</h3>
+                <span 
+                  className="text-sm text-muted-foreground"
+                  aria-live="polite"
+                  role="status"
+                >
+                  {calculateProgress()}%
+                </span>
+              </div>
+              <Progress 
+                value={calculateProgress()} 
+                className="h-2"
+                aria-label={`Goal progress: ${calculateProgress()}%`}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="space-y-4">
+          {goal.steps.map((step) => (
+            <Card key={step.id}>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">{step.text}</h3>
+                    <span className="text-sm text-muted-foreground">{step.stepType}</span>
+                  </div>
+
+                  <div 
+                    className="space-y-2"
+                    role="list"
+                    aria-label={`Tasks for step: ${step.text}`}
+                  >
+                    <div className="sr-only">
+                      Use arrow keys to navigate between tasks, Enter or Space to toggle completion
+                    </div>
+                    {step.tasks
+                      .slice()
+                      .sort((a, b) => {
+                        // Sort by due date (overdue first, then upcoming)
+                        if (!a.dueDate && !b.dueDate) return 0;
+                        if (!a.dueDate) return 1;
+                        if (!b.dueDate) return -1;
+                        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+                      })
+                      .map((task, taskIndex) => (
+                      <div 
+                        key={task.id} 
+                        className="flex items-center space-x-2"
+                        role="listitem"
+                        tabIndex={0}
+                        ref={el => {
+                          if (el) taskRefs.current[`${step.id}-${task.id}`] = el;
+                        }}
+                        onKeyDown={(e) => handleTaskKeyDown(e, step.id, task.id, taskIndex, step.tasks)}
+                      >
+                        <Checkbox
+                          checked={task.status === 'completed'}
+                          disabled={disabled}
+                          aria-label={`Mark task "${task.text}" as ${task.status === 'completed' ? 'incomplete' : 'complete'}`}
+                          onCheckedChange={(checked) => 
+                            handleTaskStatusChange(step.id, task.id, checked as boolean)
+                          }
+                        />
+                        <div className="flex-1 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span 
+                              className={cn(
+                                "py-2",
+                                task.status === 'completed' && "line-through text-muted-foreground",
+                                task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed' && "text-destructive"
+                              )}
+                              role="presentation"
+                            >
+                              {task.text}
+                            </span>
+                            {task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed' && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <AlertCircle 
+                                      className="h-4 w-4 text-destructive cursor-help" 
+                                      aria-label="Task is overdue"
+                                    />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Task was due on {format(new Date(task.dueDate), 'MMMM d')}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={cn(
+                                  "ml-2",
+                                  task.dueDate && "text-primary"
+                                )}
+                                disabled={disabled}
+                                aria-label={task.dueDate 
+                                  ? `Due date: ${format(new Date(task.dueDate), 'MMMM d')}. Press Alt+D to change, Alt+C to clear`
+                                  : "Set due date. Press Alt+D to open calendar"}
+                                onKeyDown={(e) => {
+                                  if (e.altKey && e.key === 'd') {
+                                    e.preventDefault();
+                                    (e.currentTarget as HTMLButtonElement).click();
+                                  } else if (e.altKey && e.key === 'c' && task.dueDate) {
+                                    e.preventDefault();
+                                    const updatedGoal: Goal = {
+                                      ...goal,
+                                      steps: goal.steps.map(s => {
+                                        if (s.id === step.id) {
+                                          return {
+                                            ...s,
+                                            tasks: s.tasks.map(t => {
+                                              if (t.id === task.id) {
+                                                return {
+                                                  ...t,
+                                                  dueDate: undefined
+                                                };
+                                              }
+                                              return t;
+                                            })
+                                          };
+                                        }
+                                        return s;
+                                      })
+                                    };
+                                    onUpdate(updatedGoal);
+                                  }
+                                }}
+                              >
+                                <CalendarIcon className="h-4 w-4" />
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="ml-2 text-sm">
+                                        {task.dueDate && format(new Date(task.dueDate), 'MMM d')}
+                                      </span>
+                                    </TooltipTrigger>
+                                    {task.dueDate && (
+                                      <TooltipContent>
+                                        <p>{format(new Date(task.dueDate), 'MMMM d, yyyy')}</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="end">
+                              <div className="p-2 space-y-2">
+                                <div className="text-sm text-muted-foreground">
+                                  Press Escape to close
+                                </div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full"
+                                  onClick={() => {
+                                    const today = new Date();
+                                    const updatedGoal: Goal = {
+                                      ...goal,
+                                      steps: goal.steps.map(s => {
+                                        if (s.id === step.id) {
+                                          return {
+                                            ...s,
+                                            tasks: s.tasks.map(t => {
+                                              if (t.id === task.id) {
+                                                return {
+                                                  ...t,
+                                                  dueDate: today
+                                                };
+                                              }
+                                              return t;
+                                            })
+                                          };
+                                        }
+                                        return s;
+                                      })
+                                    };
+                                    onUpdate(updatedGoal);
+                                  }}
+                                >
+                                  Set to Today
+                                </Button>
+                              </div>
+                              <Calendar
+                                mode="single"
+                                selected={task.dueDate ? new Date(task.dueDate) : undefined}
+                                onSelect={(date) => {
+                                  const updatedGoal: Goal = {
+                                    ...goal,
+                                    steps: goal.steps.map(s => {
+                                      if (s.id === step.id) {
+                                        return {
+                                          ...s,
+                                          tasks: s.tasks.map(t => {
+                                            if (t.id === task.id) {
+                                              return {
+                                                ...t,
+                                                dueDate: date
+                                              };
+                                            }
+                                            return t;
+                                          })
+                                        };
+                                      }
+                                      return s;
+                                    })
+                                  };
+                                  onUpdate(updatedGoal);
+                                  // Announce the date change to screen readers
+                                  const announcement = date 
+                                    ? `Due date set to ${format(date, 'MMMM d')}`
+                                    : 'Due date cleared';
+                                  const live = document.createElement('div');
+                                  live.setAttribute('aria-live', 'polite');
+                                  live.textContent = announcement;
+                                  document.body.appendChild(live);
+                                  setTimeout(() => document.body.removeChild(live), 1000);
+                                }}
+                                disabled={disabled}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center space-x-2 mt-4">
+                    <Input
+                      placeholder="Add a task..."
+                      value={newTaskText[step.id] || ''}
+                      disabled={disabled}
+                      aria-label={`Add task to step: ${step.text}`}
+                      onChange={(e) => setNewTaskText(prev => ({
+                        ...prev,
+                        [step.id]: e.target.value
+                      }))}
+                      onKeyDown={async (e) => {
+                        if (e.key === 'Enter' && !disabled) {
+                          e.preventDefault();
+                          const newTask = await handleAddTask(step.id);
+                          if (newTask) {
+                            // Focus the newly added task after a brief delay to allow for DOM update
+                            setTimeout(() => focusTask(step.id, newTask.id), 100);
+                          }
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => handleAddTask(step.id)}
+                      disabled={disabled}
+                    >
+                      {disabled ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        'Add'
+                      )}
+                    </Button>
                   </div>
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-lg">
-                      {step.text}
-                      <span className="ml-2 text-sm text-muted-foreground">
-                        ({step.stepType})
-                      </span>
-                    </h3>
-                  </div>
-                  
-                  <div className="mt-4 space-y-2">
-                    {step.tasks.map((task, taskIndex) => (
-                      <FlipTask
-                        key={task.id}
-                        task={task}
-                        onComplete={() => handleTaskCompletion(index, taskIndex)}
-                        onDateChange={(date) => handleTaskDateChange(step.id, task.id, date)}
-                      />
-                    ))}
-                    <div className="ml-6 mt-2 space-y-2">
-                      <div className="flex space-x-2">
-                        <Input
-                          value={newTaskText[step.id] || ''}
-                          onChange={(e) => setNewTaskText(prev => ({
-                            ...prev,
-                            [step.id]: e.target.value
-                          }))}
-                          placeholder="New task..."
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') addTask(step.id);
-                          }}
-                          className="h-8"
-                        />
-                        <button
-                          onClick={() => addTask(step.id)}
-                          className="flex items-center text-primary hover:text-primary/80"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {showNewStep ? (
+          <Card>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <Input
+                  placeholder="Enter step description..."
+                  value={newStepText}
+                  disabled={disabled}
+                  aria-label="Enter new step description"
+                  onChange={(e) => setNewStepText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !disabled) {
+                      e.preventDefault();
+                      handleAddStep();
+                    } else if (e.key === 'Escape') {
+                      setShowNewStep(false);
+                      setNewStepText('');
+                    }
+                  }}
+                  autoFocus
+                />
+                <div className="flex justify-end space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowNewStep(false);
+                      setNewStepText('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleAddStep}
+                    disabled={disabled}
+                  >
+                    {disabled ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Add Step'
+                    )}
+                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
-        ))}
-
-        {/* Add New Step Card */}
-        <Card className="hover:shadow-lg transition-shadow border-dashed">
-          <CardContent className="p-6">
-            {showNewStep ? (
-              <div className="flex space-x-2">
-                <Input
-                  value={newStepText}
-                  onChange={(e) => setNewStepText(e.target.value)}
-                  placeholder="New step title..."
-                  className="flex-1"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') addStep();
-                  }}
-                />
-                <button
-                  onClick={addStep}
-                  className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90"
-                >
-                  Add
-                </button>
-              </div>
+        ) : (
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => !disabled && setShowNewStep(true)}
+            disabled={disabled}
+            aria-label="Add new step to goal"
+          >
+            {disabled ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
-              <button
-                onClick={() => setShowNewStep(true)}
-                className="w-full flex items-center justify-center space-x-2 text-primary hover:text-primary/80"
-              >
-                <FolderPlus className="w-5 h-5" />
-                <span>Add New Step</span>
-              </button>
+              <Plus className="w-4 h-4 mr-2" />
             )}
-          </CardContent>
-        </Card>
+            Add Step
+          </Button>
+        )}
       </div>
-
-      <style>{`
-        @keyframes flip-in {
-          0% {
-            transform: perspective(400px) rotateX(-90deg);
-            opacity: 0;
-          }
-          40% {
-            transform: perspective(400px) rotateX(20deg);
-          }
-          60% {
-            transform: perspective(400px) rotateX(-10deg);
-          }
-          80% {
-            transform: perspective(400px) rotateX(5deg);
-          }
-          100% {
-            transform: perspective(400px) rotateX(0deg);
-            opacity: 1;
-          }
-        }
-        
-        .animate-flip-in {
-          animation: flip-in 0.6s ease-out forwards;
-          backface-visibility: visible !important;
-        }
-      `}</style>
-    </div>
+    </>
   );
 }
