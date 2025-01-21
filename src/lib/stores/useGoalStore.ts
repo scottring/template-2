@@ -39,18 +39,53 @@ interface GoalStore {
 const convertFirestoreTimestamps = (data: DocumentData): Partial<Goal> => {
   return {
     ...data,
-    createdAt: data.createdAt?.toDate(),
-    updatedAt: data.updatedAt?.toDate(),
-    startDate: data.startDate?.toDate(),
-    targetDate: data.targetDate?.toDate(),
+    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : 
+               data.createdAt instanceof Date ? data.createdAt : 
+               new Date(),
+    updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : 
+               data.updatedAt instanceof Date ? data.updatedAt : 
+               new Date(),
+    startDate: data.startDate instanceof Timestamp ? data.startDate.toDate() : 
+               data.startDate instanceof Date ? data.startDate : 
+               new Date(),
+    targetDate: data.targetDate instanceof Timestamp ? data.targetDate.toDate() : 
+                data.targetDate instanceof Date ? data.targetDate : 
+                data.targetDate ? new Date(data.targetDate) : null,
     steps: data.steps?.map((step: any) => ({
       ...step,
-      nextOccurrence: step.nextOccurrence?.toDate(),
-      repeatEndDate: step.repeatEndDate?.toDate(),
-      tasks: step.tasks || [],
+      nextOccurrence: step.nextOccurrence instanceof Timestamp ? step.nextOccurrence.toDate() :
+                     step.nextOccurrence instanceof Date ? step.nextOccurrence :
+                     step.nextOccurrence ? new Date(step.nextOccurrence) : null,
+      repeatEndDate: step.repeatEndDate instanceof Timestamp ? step.repeatEndDate.toDate() :
+                    step.repeatEndDate instanceof Date ? step.repeatEndDate :
+                    step.repeatEndDate ? new Date(step.repeatEndDate) : null,
+      tasks: (step.tasks || []).map((task: any) => ({
+        ...task,
+        dueDate: task.dueDate instanceof Timestamp ? task.dueDate.toDate() :
+                task.dueDate instanceof Date ? task.dueDate :
+                task.dueDate ? new Date(task.dueDate) : null
+      })),
       notes: step.notes || []
     })) || []
   };
+};
+
+const removeUndefined = (obj: any): any => {
+  const result: any = {};
+  Object.entries(obj).forEach(([key, value]) => {
+    if (value !== undefined) {
+      if (Array.isArray(value)) {
+        result[key] = value.map(item => 
+          typeof item === 'object' && item !== null ? removeUndefined(item) : item
+        );
+      } else if (typeof value === 'object' && value !== null) {
+        result[key] = removeUndefined(value);
+      } else {
+        result[key] = value;
+      }
+    }
+  });
+  return result;
 };
 
 const useGoalStore = create<GoalStore>((set, get) => ({
@@ -217,8 +252,8 @@ const useGoalStore = create<GoalStore>((set, get) => ({
       const updateData = {
         ...updates,
         updatedAt: serverTimestamp(),
-        startDate: updates.startDate ? Timestamp.fromDate(updates.startDate) : undefined,
-        targetDate: updates.targetDate ? Timestamp.fromDate(updates.targetDate) : undefined,
+        startDate: updates.startDate ? Timestamp.fromDate(updates.startDate) : null,
+        targetDate: updates.targetDate ? Timestamp.fromDate(updates.targetDate) : null,
         steps: updates.steps?.map(step => ({
           id: step.id,
           text: step.text || '',
@@ -227,7 +262,8 @@ const useGoalStore = create<GoalStore>((set, get) => ({
           tasks: (step.tasks || []).map(task => ({
             id: task.id,
             text: task.text || '',
-            completed: Boolean(task.completed)
+            status: task.status || 'pending',
+            dueDate: task.dueDate ? Timestamp.fromDate(task.dueDate) : null
           })),
           notes: (step.notes || []).map(note => ({
             id: note.id,
@@ -243,8 +279,11 @@ const useGoalStore = create<GoalStore>((set, get) => ({
         }))
       };
       
-      console.log('Updating goal with data:', updateData);
-      await updateDoc(doc(db, 'goals', goalId), updateData);
+      // Remove any undefined values before sending to Firestore
+      const cleanUpdateData = removeUndefined(updateData);
+      
+      console.log('Updating goal with data:', cleanUpdateData);
+      await updateDoc(doc(db, 'goals', goalId), cleanUpdateData);
       const docSnap = await getDoc(doc(db, 'goals', goalId));
       const data = docSnap.data();
       

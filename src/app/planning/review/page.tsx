@@ -357,7 +357,7 @@ export default function ReviewPage() {
       if (!existingItem) {
         // Create a new itinerary item
         const newItem = {
-          type: item.type,
+          type: "task" as const,
           referenceId: item.type === 'task' ? item.id : item.goalId!,
           stepId: item.stepId ?? '',
           notes: item.text,
@@ -365,6 +365,8 @@ export default function ReviewPage() {
           householdId: user.householdId,
           createdBy: user.uid,
           updatedBy: user.uid,
+          ownerId: user.uid,
+          visibility: "private" as const,
           schedule: {
             startDate: new Date(),
             schedules: [] as { day: number; time: string; }[],
@@ -386,7 +388,7 @@ export default function ReviewPage() {
           console.error('Error updating item:', error);
           // If update fails, create a new item
           const newItem = {
-            type: item.type,
+            type: (item.type === 'habit' ? 'routine' : 'task') as 'task' | 'routine',
             referenceId: item.type === 'task' ? item.id : item.goalId!,
             stepId: item.stepId ?? '',
             notes: item.text,
@@ -394,6 +396,8 @@ export default function ReviewPage() {
             householdId: user.householdId,
             createdBy: user.uid,
             updatedBy: user.uid,
+            ownerId: user.uid,
+            visibility: "private" as const,
             schedule: {
               startDate: new Date(),
               schedules: [] as { day: number; time: string; }[],
@@ -455,7 +459,7 @@ export default function ReviewPage() {
 
     // Create a new itinerary item for the rescheduled step
     const newItem = {
-      type: selectedItem.type,
+      type: "task" as const,
       referenceId: selectedItem.goalId!,
       stepId: selectedItem.stepId ?? '',
       notes: selectedItem.text,
@@ -463,6 +467,8 @@ export default function ReviewPage() {
       householdId: user.householdId,
       createdBy: user.uid,
       updatedBy: user.uid,
+      ownerId: user.uid,
+      visibility: "private" as const,
       schedule: {
         startDate: new Date(),
         schedules: config.schedules,

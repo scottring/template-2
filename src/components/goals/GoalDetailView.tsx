@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -34,13 +34,26 @@ const FlipTask = ({
       "flex items-center space-x-2 ml-6 transform-gpu",
       isNew && "animate-flip-in origin-top"
     )}>
-      <Checkbox
-        checked={task.status === 'completed'}
-        onCheckedChange={onComplete}
-      />
-      <span className={task.status === 'completed' ? 'text-muted-foreground line-through' : ''}>
-        {task.text}
-      </span>
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id={task.id}
+          checked={task.status === 'completed'}
+          onCheckedChange={() => {
+            console.log('Checkbox clicked, current status:', task.status);
+            onComplete();
+          }}
+          className="data-[state=checked]:bg-primary"
+        />
+        <label
+          htmlFor={task.id}
+          className={cn(
+            "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
+            task.status === 'completed' && "text-muted-foreground line-through"
+          )}
+        >
+          {task.text}
+        </label>
+      </div>
       <Popover>
         <PopoverTrigger asChild>
           <Button
@@ -49,14 +62,17 @@ const FlipTask = ({
             className="ml-auto text-muted-foreground hover:text-foreground"
           >
             <CalendarIcon className="w-4 h-4 mr-2" />
-            {task.dueDate ? format(task.dueDate, 'MMM d') : 'Set due date'}
+            {task.dueDate ? format(new Date(task.dueDate), 'MMM d') : 'Set due date'}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
           <Calendar
             mode="single"
-            selected={task.dueDate}
-            onSelect={onDateChange}
+            selected={task.dueDate ? new Date(task.dueDate) : undefined}
+            onSelect={(date) => {
+              console.log('Date selected:', date);
+              onDateChange(date || undefined);
+            }}
             initialFocus
           />
         </PopoverContent>
@@ -81,38 +97,47 @@ export default function GoalDetailView({ goal, onUpdate }: GoalDetailViewProps) 
   };
 
   const handleTaskCompletion = (stepId: string, taskId: string) => {
+    console.log('Handling task completion for step:', stepId, 'task:', taskId);
     const updatedSteps = goal.steps.map(step => {
       if (step.id === stepId) {
         return {
           ...step,
-          tasks: step.tasks.map(task => 
-            task.id === taskId 
-              ? { ...task, status: task.status === 'completed' ? ('pending' as const) : ('completed' as const) }
-              : task
-          )
+          tasks: step.tasks.map(task => {
+            if (task.id === taskId) {
+              const newStatus = task.status === 'completed' ? ('pending' as const) : ('completed' as const);
+              console.log('Updating task status from', task.status, 'to', newStatus);
+              return { ...task, status: newStatus };
+            }
+            return task;
+          })
         };
       }
       return step;
     });
 
+    console.log('Calling onUpdate with updated steps');
     onUpdate({ ...goal, steps: updatedSteps });
   };
 
   const handleTaskDateChange = (stepId: string, taskId: string, date: Date | undefined) => {
+    console.log('Handling date change for step:', stepId, 'task:', taskId, 'date:', date);
     const updatedSteps = goal.steps.map(step => {
       if (step.id === stepId) {
         return {
           ...step,
-          tasks: step.tasks.map(task => 
-            task.id === taskId 
-              ? { ...task, dueDate: date }
-              : task
-          )
+          tasks: step.tasks.map(task => {
+            if (task.id === taskId) {
+              console.log('Updating task date from', task.dueDate, 'to', date);
+              return { ...task, dueDate: date };
+            }
+            return task;
+          })
         };
       }
       return step;
     });
 
+    console.log('Calling onUpdate with updated steps');
     onUpdate({ ...goal, steps: updatedSteps });
   };
 
@@ -178,7 +203,7 @@ export default function GoalDetailView({ goal, onUpdate }: GoalDetailViewProps) 
           <h1 className="text-2xl font-bold">{goal.name}</h1>
           <div className="flex items-center mt-2 text-muted-foreground">
             <CalendarIcon className="w-4 h-4 mr-2" />
-            <span>Due: {goal.targetDate?.toLocaleDateString()}</span>
+            <span>Due: {goal.targetDate && isValid(new Date(goal.targetDate)) ? format(new Date(goal.targetDate), 'MMM d, yyyy') : 'No due date set'}</span>
           </div>
         </div>
         <button className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90">
