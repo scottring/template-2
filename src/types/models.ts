@@ -107,6 +107,7 @@ export interface StepTask {
   id: string;
   text: string;
   status: 'pending' | 'completed' | 'cancelled';
+  dueDate?: Date;
   isNew?: boolean;
 }
 
