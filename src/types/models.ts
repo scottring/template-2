@@ -74,6 +74,7 @@ export interface Task extends BaseItem {
   completedAt?: Date;
   checklist: ChecklistItem[];
   notes: Note[];
+  isNew?: boolean;
 }
 
 export type GoalType = 'Routine' | 'Project' | 'One Time Task';
@@ -102,6 +103,13 @@ export interface Area extends BaseItem {
   assignedTo: string[];
 }
 
+export interface StepTask {
+  id: string;
+  text: string;
+  status: 'pending' | 'completed' | 'cancelled';
+  isNew?: boolean;
+}
+
 export interface Step {
   id: string;
   text: string;
@@ -118,8 +126,9 @@ export interface Step {
   scheduledTimes?: {
     [day: string]: string[];
   };
-  tasks: { id: string; text: string; completed: boolean; }[];
-  notes: { id: string; text: string; timestamp: Date; }[];
+  tasks: StepTask[];
+  notes: string[];
+  isNew?: boolean;
 }
 
 export interface ChecklistItem {
