@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addMonths } from 'date-fns';
+import { safeDate } from '@/lib/utils';
 import { ArrowRight, ArrowLeft, CalendarIcon, Target, CheckCircle2, Clock } from 'lucide-react';
 import {
   Select,
@@ -421,7 +422,7 @@ export function FlowPlanner({ goals, onComplete, onCancel }: FlowPlannerProps) {
                           </div>
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4" />
-                            <span>Due {format(goals[currentGoalIndex].targetDate || new Date(), 'PP')}</span>
+                            <span>Due {format(safeDate(goals[currentGoalIndex].targetDate), 'PP')}</span>
                           </div>
                         </div>
 

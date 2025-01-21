@@ -50,20 +50,20 @@ const convertFirestoreTimestamps = (data: DocumentData): Partial<Goal> => {
                new Date(),
     targetDate: data.targetDate instanceof Timestamp ? data.targetDate.toDate() : 
                 data.targetDate instanceof Date ? data.targetDate : 
-                data.targetDate ? new Date(data.targetDate) : null,
+                data.targetDate ? new Date(data.targetDate) : undefined,
     steps: data.steps?.map((step: any) => ({
       ...step,
       nextOccurrence: step.nextOccurrence instanceof Timestamp ? step.nextOccurrence.toDate() :
                      step.nextOccurrence instanceof Date ? step.nextOccurrence :
-                     step.nextOccurrence ? new Date(step.nextOccurrence) : null,
+                     step.nextOccurrence ? new Date(step.nextOccurrence) : undefined,
       repeatEndDate: step.repeatEndDate instanceof Timestamp ? step.repeatEndDate.toDate() :
                     step.repeatEndDate instanceof Date ? step.repeatEndDate :
-                    step.repeatEndDate ? new Date(step.repeatEndDate) : null,
+                    step.repeatEndDate ? new Date(step.repeatEndDate) : undefined,
       tasks: (step.tasks || []).map((task: any) => ({
         ...task,
         dueDate: task.dueDate instanceof Timestamp ? task.dueDate.toDate() :
                 task.dueDate instanceof Date ? task.dueDate :
-                task.dueDate ? new Date(task.dueDate) : null
+                task.dueDate ? new Date(task.dueDate) : undefined
       })),
       notes: step.notes || []
     })) || []
@@ -252,30 +252,22 @@ const useGoalStore = create<GoalStore>((set, get) => ({
       const updateData = {
         ...updates,
         updatedAt: serverTimestamp(),
-        startDate: updates.startDate ? Timestamp.fromDate(updates.startDate) : null,
-        targetDate: updates.targetDate ? Timestamp.fromDate(updates.targetDate) : null,
+        startDate: updates.startDate ? Timestamp.fromDate(updates.startDate) : undefined,
+        targetDate: updates.targetDate ? Timestamp.fromDate(updates.targetDate) : undefined,
         steps: updates.steps?.map(step => ({
           id: step.id,
-          text: step.text || '',
-          stepType: step.stepType || 'Tangible',
-          isTracked: Boolean(step.isTracked),
+          text: step.text,
+          stepType: step.stepType,
+          isTracked: step.isTracked,
           tasks: (step.tasks || []).map(task => ({
             id: task.id,
-            text: task.text || '',
-            status: task.status || 'pending',
-            dueDate: task.dueDate ? Timestamp.fromDate(task.dueDate) : null
+            text: task.text,
+            status: task.status,
+            dueDate: task.dueDate ? Timestamp.fromDate(new Date(task.dueDate)) : undefined
           })),
-          notes: (step.notes || []).map(note => ({
-            id: note.id,
-            text: note.text || '',
-            timestamp: note.timestamp ? Timestamp.fromDate(note.timestamp) : serverTimestamp()
-          })),
-          selectedDays: step.selectedDays || [],
-          scheduledTimes: step.scheduledTimes || {},
-          frequency: step.frequency || 1,
-          timescale: step.timescale || 'weekly',
-          nextOccurrence: step.nextOccurrence ? Timestamp.fromDate(step.nextOccurrence) : null,
-          repeatEndDate: step.repeatEndDate ? Timestamp.fromDate(step.repeatEndDate) : null
+          notes: step.notes || [],
+          nextOccurrence: step.nextOccurrence ? Timestamp.fromDate(new Date(step.nextOccurrence)) : undefined,
+          repeatEndDate: step.repeatEndDate ? Timestamp.fromDate(new Date(step.repeatEndDate)) : undefined
         }))
       };
       
@@ -284,10 +276,13 @@ const useGoalStore = create<GoalStore>((set, get) => ({
       
       console.log('Updating goal with data:', cleanUpdateData);
       await updateDoc(doc(db, 'goals', goalId), cleanUpdateData);
+      
+      // Fetch the updated document
       const docSnap = await getDoc(doc(db, 'goals', goalId));
       const data = docSnap.data();
       
       if (data) {
+        // Update the local state with the converted timestamps
         set(state => ({
           goals: state.goals.map(goal => 
             goal.id === goalId ? {

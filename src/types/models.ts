@@ -106,9 +106,10 @@ export interface Area extends BaseItem {
 export interface StepTask {
   id: string;
   text: string;
-  status: 'pending' | 'completed' | 'cancelled';
+  status: 'pending' | 'completed';
   dueDate?: Date;
   isNew?: boolean;
+  // Completed state is tracked via status field
 }
 
 export interface Step {

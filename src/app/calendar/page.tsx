@@ -7,9 +7,6 @@ export default function CalendarPage() {
         <h1 className="text-2xl font-semibold">Calendar</h1>
       </div>
 
-      <div className="bg-white shadow rounded-lg p-6">
-        <p className="text-gray-500">Calendar integration coming soon...</p>
-      </div>
     </div>
   );
 } 

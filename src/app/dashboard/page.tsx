@@ -113,10 +113,10 @@ export default function DashboardPage() {
     // Get active goals (in progress)
     const inProgressGoals = activeGoals.filter(goal => {
       const hasCompletedSteps = goal.steps.some(step => 
-        step.isTracked && step.tasks?.some(task => task.completed)
+        step.isTracked && step.tasks?.some(task => task.status === 'completed')
       );
       const hasIncompleteSteps = goal.steps.some(step => 
-        step.isTracked && (!step.tasks?.length || step.tasks.some(task => !task.completed))
+        step.isTracked && (!step.tasks?.length || step.tasks.some(task => task.status !== 'completed'))
       );
       return hasCompletedSteps && hasIncompleteSteps;
     });
@@ -326,7 +326,7 @@ export default function DashboardPage() {
                         <h3 className="font-medium">{goal.name}</h3>
                         <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
                           {Math.round(
-                            (goal.steps.filter(s => s.isTracked && s.tasks?.every(t => t.completed)).length /
+                            (goal.steps.filter(s => s.isTracked && s.tasks?.every(t => t.status === 'completed')).length /
                             goal.steps.filter(s => s.isTracked).length) * 100
                           )}%
                         </span>

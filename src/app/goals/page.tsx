@@ -73,7 +73,7 @@ export default function GoalsPage() {
       startDate: new Date(),
       targetDate: data.targetDate,
       progress: 0,
-      goalType: 'Tangible',
+      goalType: 'tangible' as GoalType,
       status: 'in_progress',
       steps: data.steps.map((step: any) => ({
         id: '', // This will be set when adding to Firebase

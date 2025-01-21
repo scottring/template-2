@@ -67,7 +67,7 @@ export default function PlanningPage() {
         const step = goal?.steps.find(s => s.id === habit.stepId);
         
         await addItem({
-          type: 'habit',
+          type: 'routine' as const,
           referenceId: habit.goalId,
           stepId: habit.stepId,
           status: 'pending',
@@ -75,6 +75,8 @@ export default function PlanningPage() {
           createdBy: user.uid,
           updatedBy: user.uid,
           notes: step?.text || '',
+          ownerId: user.uid,
+          visibility: 'private',
           schedule: {
             startDate: data.startDate,
             schedules,
@@ -91,7 +93,7 @@ export default function PlanningPage() {
       const step = goal?.steps.find(s => s.id === task.stepId);
 
       await addItem({
-        type: 'tangible',
+        type: 'project' as const,
         referenceId: task.goalId,
         stepId: task.stepId,
         status: 'pending',
@@ -99,6 +101,8 @@ export default function PlanningPage() {
         createdBy: user.uid,
         updatedBy: user.uid,
         notes: step?.text || '',
+        ownerId: user.uid,
+        visibility: 'private',
         schedule: {
           startDate: task.scheduledDate,
           schedules: task.scheduledTime ? [{ day: 0, time: task.scheduledTime }] : [],
