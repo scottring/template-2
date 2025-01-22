@@ -82,8 +82,22 @@ const sampleData = {
   ],
   tasks: [
     {
-      title: 'Test Task 1',
-      description: 'A sample task for testing',
+      title: 'Urgent Task Due Today',
+      description: 'This should appear in Today\'s Tasks',
+      status: 'pending',
+      dueDate: new Date(), // Today
+      assignedTo: ['test@example.com']
+    },
+    {
+      title: 'Completed Yesterday Task',
+      description: 'This should count towards completed tasks',
+      status: 'completed',
+      dueDate: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+      assignedTo: ['test@example.com']
+    },
+    {
+      title: 'Upcoming Tomorrow Task',
+      description: 'This should appear in Next Tasks',
       status: 'pending',
       dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000), // Tomorrow
       assignedTo: ['test@example.com']
@@ -145,4 +159,4 @@ async function seedDatabase() {
 }
 
 // Run the seed function
-seedDatabase(); 
+seedDatabase();
